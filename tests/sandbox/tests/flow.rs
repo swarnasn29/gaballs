@@ -201,13 +201,17 @@ async fn launch_packs_sweep_claim_transfer_claim() -> TestResult {
     let machines: Vec<Value> = env.view(&env.factory, "get_machines", json!({})).await;
     assert_eq!(machines.len(), 1);
     assert_eq!(machines[0]["account_id"], machine.as_str());
+    assert_eq!(machines[0]["nft_minted"], true, "launch callback confirmed the NFT mint");
+    assert_eq!(machines[0]["usdt_registered"], true, "launch callback confirmed USDT registration");
+    let retry = env.fails(&env.creator, &env.factory, "retry_machine_setup", json!({ "machine": machine }), NearToken::from_millinear(100)).await;
+    assert!(retry, "retry is refused once setup is complete");
     let nft: Value = env.view(&env.nft, "nft_token", json!({ "token_id": token_id })).await;
     assert_eq!(nft["owner_id"], env.creator.as_str(), "creator owns the Machine NFT");
 
     // The machine account has no access keys at all: nobody can redeploy or change it.
     let keys = near_api::Account(machine.clone()).list_keys().fetch_from(&env.net).await?.data;
     assert!(keys.is_empty(), "machine must have no access keys, found {keys:?}");
-    println!("1. launched {machine}; Machine NFT -> {}; access keys on machine: {}", env.creator, keys.len());
+    println!("1. launched {machine}; Machine NFT -> {}; setup confirmed (nft_minted, usdt_registered); access keys on machine: {}", env.creator, keys.len());
 
     // The deployed (production) machine has no test hook.
     let hook = env.fails(&env.buyer, &machine, "test_force_next_tier", json!({ "tier": 3 }), NearToken::from_near(0)).await;

@@ -32,7 +32,8 @@ pub const NFT_MINT_DEPOSIT: NearToken = NearToken::from_millinear(50);
 pub const USDT_STORAGE_DEPOSIT: NearToken = NearToken::from_millinear(13);
 
 const GAS_FOR_MACHINE_INIT: Gas = Gas::from_tgas(30);
-const GAS_FOR_ON_LAUNCHED: Gas = Gas::from_tgas(60);
+const GAS_FOR_ON_LAUNCHED: Gas = Gas::from_tgas(90);
+const GAS_FOR_SETUP_CALLBACK: Gas = Gas::from_tgas(5);
 const GAS_FOR_NFT_MINT: Gas = Gas::from_tgas(20);
 const GAS_FOR_STORAGE_DEPOSIT: Gas = Gas::from_tgas(10);
 
@@ -63,6 +64,10 @@ pub struct MachineInfo {
     pub creator: AccountId,
     pub nft_token_id: String,
     pub launched_at_block: u64,
+    /// The Machine NFT mint was confirmed. If false, anyone can call `retry_machine_setup`.
+    pub nft_minted: bool,
+    /// The machine's USDT storage registration was confirmed. If false, `retry_machine_setup` redoes it.
+    pub usdt_registered: bool,
 }
 
 #[near(serializers = [json])]
@@ -90,6 +95,26 @@ pub struct Factory {
     machines: IterableMap<AccountId, MachineInfo>,
     machine_code_len: u64,
     machine_code_sha256: Option<[u8; 32]>,
+}
+
+impl Factory {
+    fn register_on_usdt(&self, machine: &AccountId) {
+        ext_usdt::ext(self.usdt_contract.clone())
+            .with_attached_deposit(USDT_STORAGE_DEPOSIT)
+            .with_static_gas(GAS_FOR_STORAGE_DEPOSIT)
+            .storage_deposit(Some(machine.clone()), Some(true))
+            .then(Self::ext(env::current_account_id()).with_static_gas(GAS_FOR_SETUP_CALLBACK).on_usdt_registered(machine.clone()))
+            .detach();
+    }
+
+    fn mint_machine_nft(&self, machine: &AccountId, creator: AccountId) {
+        ext_nft::ext(self.nft_contract.clone())
+            .with_attached_deposit(NFT_MINT_DEPOSIT)
+            .with_static_gas(GAS_FOR_NFT_MINT)
+            .mint_machine_nft(creator, machine.clone())
+            .then(Self::ext(env::current_account_id()).with_static_gas(GAS_FOR_SETUP_CALLBACK).on_nft_minted(machine.clone()))
+            .detach();
+    }
 }
 
 #[near]
@@ -195,19 +220,59 @@ impl Factory {
             creator: creator.clone(),
             nft_token_id: format!("machine:{machine}"),
             launched_at_block: env::block_height(),
+            nft_minted: false,
+            usdt_registered: false,
         };
         self.machines.insert(machine.clone(), info);
-        ext_usdt::ext(self.usdt_contract.clone())
-            .with_attached_deposit(USDT_STORAGE_DEPOSIT)
-            .with_static_gas(GAS_FOR_STORAGE_DEPOSIT)
-            .storage_deposit(Some(machine.clone()), Some(true))
-            .detach();
-        ext_nft::ext(self.nft_contract.clone())
-            .with_attached_deposit(NFT_MINT_DEPOSIT)
-            .with_static_gas(GAS_FOR_NFT_MINT)
-            .mint_machine_nft(creator, machine)
-            .detach();
+        self.register_on_usdt(&machine);
+        self.mint_machine_nft(&machine, creator);
         true
+    }
+
+    /// Redoes whichever launch step did not complete (USDT registration and/or the Machine NFT mint).
+    /// Anyone may call it: the NFT can only go to the creator recorded at launch, and the NFT contract rejects a
+    /// second mint for the same machine. Attach `get_retry_cost(machine)`; any excess is refunded.
+    #[payable]
+    pub fn retry_machine_setup(&mut self, machine: AccountId) {
+        let info = self.machines.get(&machine).cloned().unwrap_or_else(|| env::panic_str("Unknown machine"));
+        require!(!info.nft_minted || !info.usdt_registered, "Machine setup is already complete");
+        let cost = self.get_retry_cost(machine.clone());
+        let deposit = env::attached_deposit();
+        require!(deposit >= cost, format!("Attach at least {} yoctoNEAR (get_retry_cost)", cost.as_yoctonear()));
+        if !info.usdt_registered {
+            self.register_on_usdt(&machine);
+        }
+        if !info.nft_minted {
+            self.mint_machine_nft(&machine, info.creator);
+        }
+        let refund = deposit.saturating_sub(cost);
+        if !refund.is_zero() {
+            Promise::new(env::predecessor_account_id()).transfer(refund).detach();
+        }
+    }
+
+    #[private]
+    pub fn on_nft_minted(&mut self, machine: AccountId) -> bool {
+        let ok = env::promise_result_checked(0, 10_000).is_ok();
+        if let Some(info) = self.machines.get_mut(&machine) {
+            info.nft_minted |= ok;
+        }
+        if !ok {
+            env::log_str(&format!("Machine NFT mint for {machine} failed; call retry_machine_setup"));
+        }
+        ok
+    }
+
+    #[private]
+    pub fn on_usdt_registered(&mut self, machine: AccountId) -> bool {
+        let ok = env::promise_result_checked(0, 10_000).is_ok();
+        if let Some(info) = self.machines.get_mut(&machine) {
+            info.usdt_registered |= ok;
+        }
+        if !ok {
+            env::log_str(&format!("USDT registration for {machine} failed; call retry_machine_setup"));
+        }
+        ok
     }
 
     // ------------------------------------------------------------------ views
@@ -220,6 +285,19 @@ impl Factory {
             .saturating_add(MACHINE_RESERVE)
             .saturating_add(NFT_MINT_DEPOSIT)
             .saturating_add(USDT_STORAGE_DEPOSIT)
+    }
+
+    /// NEAR to attach to `retry_machine_setup` for the steps still missing (0 if setup is complete).
+    pub fn get_retry_cost(&self, machine: AccountId) -> NearToken {
+        let info = self.machines.get(&machine).unwrap_or_else(|| env::panic_str("Unknown machine"));
+        let mut cost = NearToken::from_near(0);
+        if !info.usdt_registered {
+            cost = cost.saturating_add(USDT_STORAGE_DEPOSIT);
+        }
+        if !info.nft_minted {
+            cost = cost.saturating_add(NFT_MINT_DEPOSIT);
+        }
+        cost
     }
 
     pub fn get_machines(&self, from_index: Option<u32>, limit: Option<u32>) -> Vec<MachineInfo> {

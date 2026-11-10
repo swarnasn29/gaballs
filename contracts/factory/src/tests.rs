@@ -134,3 +134,86 @@ fn launch_rejects_duplicate_symbol() {
     let cost = f.get_launch_cost();
     launch(&mut f, "gold", cost);
 }
+
+// ------------------------------------------------------------------ retry_machine_setup
+
+fn gold() -> AccountId {
+    acc("gold.gaballs.testnet")
+}
+
+/// A launched machine whose setup callbacks have not reported yet (both flags false).
+fn launched() -> Factory {
+    let mut f = factory_with_code();
+    ctx_callback(PromiseResult::Successful(vec![]));
+    f.on_launched(gold(), creator(), "Gold".into(), "GOLD".into(), NearToken::from_near(3));
+    f
+}
+
+fn info(f: &Factory) -> MachineInfo {
+    f.get_machine(gold()).unwrap()
+}
+
+#[test]
+fn setup_flags_follow_callback_results() {
+    let mut f = launched();
+    assert!(!info(&f).nft_minted && !info(&f).usdt_registered);
+    ctx_callback(PromiseResult::Successful(vec![]));
+    assert!(f.on_usdt_registered(gold()));
+    ctx_callback(PromiseResult::Failed);
+    assert!(!f.on_nft_minted(gold()));
+    assert!(info(&f).usdt_registered);
+    assert!(!info(&f).nft_minted);
+}
+
+#[test]
+fn retry_cost_covers_only_missing_steps() {
+    let mut f = launched();
+    assert_eq!(f.get_retry_cost(gold()), NFT_MINT_DEPOSIT.saturating_add(USDT_STORAGE_DEPOSIT));
+    ctx_callback(PromiseResult::Successful(vec![]));
+    f.on_usdt_registered(gold());
+    assert_eq!(f.get_retry_cost(gold()), NFT_MINT_DEPOSIT);
+}
+
+#[test]
+fn retry_after_failed_mint_succeeds_and_completes() {
+    let mut f = launched();
+    ctx_callback(PromiseResult::Successful(vec![]));
+    f.on_usdt_registered(gold());
+    ctx_callback(PromiseResult::Failed);
+    f.on_nft_minted(gold());
+    // Anyone (here a stranger) can pay for the retry; the NFT still goes to the recorded creator.
+    ctx(acc("stranger.testnet"), NFT_MINT_DEPOSIT, b"");
+    f.retry_machine_setup(gold());
+    ctx_callback(PromiseResult::Successful(vec![]));
+    assert!(f.on_nft_minted(gold()));
+    assert!(info(&f).nft_minted && info(&f).usdt_registered);
+    assert_eq!(info(&f).creator, creator());
+}
+
+#[test]
+#[should_panic(expected = "Machine setup is already complete")]
+fn retry_rejected_when_setup_complete() {
+    let mut f = launched();
+    ctx_callback(PromiseResult::Successful(vec![]));
+    f.on_usdt_registered(gold());
+    ctx_callback(PromiseResult::Successful(vec![]));
+    f.on_nft_minted(gold());
+    ctx(creator(), NFT_MINT_DEPOSIT, b"");
+    f.retry_machine_setup(gold());
+}
+
+#[test]
+#[should_panic(expected = "Attach at least")]
+fn retry_requires_deposit() {
+    let mut f = launched();
+    ctx(creator(), NearToken::from_yoctonear(1), b"");
+    f.retry_machine_setup(gold());
+}
+
+#[test]
+#[should_panic(expected = "Unknown machine")]
+fn retry_unknown_machine_fails() {
+    let mut f = factory_with_code();
+    ctx(creator(), NFT_MINT_DEPOSIT, b"");
+    f.retry_machine_setup(acc("nope.gaballs.testnet"));
+}

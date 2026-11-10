@@ -48,7 +48,7 @@ How the money flows: buyer → `usdt.ft_transfer_call(machine, 10 USDT)` → mac
 _TBD — exact versions of Rust, cargo-near, near-cli-rs, Node._
 
 ### Build and test
-1. Unit tests: `cargo test --workspace` → four `test result: ok` lines: factory 10, machine 23, mock-usdt 5, nft 27.
+1. Unit tests: `cargo test --workspace` → four `test result: ok` lines: factory 16, machine 23, mock-usdt 5, nft 27.
 2. Build all contracts to wasm:
    - macOS / Linux: `./scripts/build-wasm.sh`
    - Windows: `powershell -ExecutionPolicy Bypass -File scripts\build-wasm.ps1` (adds `--no-abi`: cargo-near's ABI
