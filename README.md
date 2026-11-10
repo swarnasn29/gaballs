@@ -44,7 +44,10 @@ Re-run the simulation: see [sim/README.md](sim/README.md).
 _TBD — exact versions of Rust, cargo-near, near-cli-rs, Node._
 
 ### Build and test
-_TBD — commands and expected output._
+1. `cargo test --workspace` → `test result: ok. 23 passed` (machine) and `ok. 5 passed` (mock-usdt).
+2. `cd contracts/machine && cargo near build non-reproducible-wasm --no-abi` → `target/near/gaballs_machine/gaballs_machine.wasm`.
+   (`--no-abi` is only needed on Windows, where cargo-near's ABI step fails to link natively.)
+3. Same for `contracts/mock-usdt`.
 
 ## 6. Verify the trust claims
 
@@ -60,6 +63,9 @@ See [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md).
 
 ## 9. Built with
 
+- near-sdk 5.30.1 and near-contract-standards 5.30.1 (NEP-141/145/148 implementation) — contracts
+- uint 0.10.2 — 256-bit integers for the curve maths
+- `cargo near new` template (cargo-near 0.23.0) — crate manifests and toolchain pin
 - Python 3.12, numpy, matplotlib — economics simulation (`sim/`)
 - AI-assisted: code in this repository was written with Claude Code (Anthropic)
 - _More added per phase._
