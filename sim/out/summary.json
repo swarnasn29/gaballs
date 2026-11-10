@@ -1,0 +1,200 @@
+{
+  "packs": 10000,
+  "runs": 200,
+  "creator_allocation": 100000000.0,
+  "expected_multiplier": 0.955,
+  "settings": {
+    "conservative": {
+      "params": {
+        "V": 10000.0,
+        "vault_seed": 150000000.0,
+        "cap_bps": 1500
+      },
+      "start_price": 1.3333333333333333e-05,
+      "behaviours": {
+        "hold": {
+          "realized_mult_median": 0.9559165471977473,
+          "realized_mult_p5": 0.9279362155938853,
+          "realized_mult_p95": 0.9867293787440096,
+          "capped_pct_median": 0.0,
+          "capped_pct_max": 0.0,
+          "capped_of_wins_pct_median": 0.0,
+          "sell_rejected_pct_median": 0.0,
+          "avg_sell_return_median": null,
+          "final_price_median": 0.0015928653333325533,
+          "price_growth_x": 119.46489999994151,
+          "final_R_median": 99299.99999997801,
+          "final_curve_tokens_median": 68618481.24430159,
+          "final_vault_median": 180037650.02239,
+          "min_vault_median": 146947572.3046115,
+          "min_vault_p5": 136319644.66279432,
+          "min_vault_as_pct_of_seed_p5": 90.87976310852954
+        },
+        "half_sell": {
+          "realized_mult_median": 0.9544687072615086,
+          "realized_mult_p5": 0.9336639151967773,
+          "realized_mult_p95": 0.9770309109049853,
+          "capped_pct_median": 0.0,
+          "capped_pct_max": 0.0,
+          "capped_of_wins_pct_median": 0.0,
+          "sell_rejected_pct_median": 0.0,
+          "avg_sell_return_median": 0.9418567805998936,
+          "final_price_median": 0.0005103510671363015,
+          "price_growth_x": 38.276330035222614,
+          "final_R_median": 51867.867285786604,
+          "final_curve_tokens_median": 121226095.72711107,
+          "final_vault_median": 205097368.52375227,
+          "min_vault_median": 148260256.56245375,
+          "min_vault_p5": 138015709.91169825,
+          "min_vault_as_pct_of_seed_p5": 92.0104732744655
+        },
+        "mythic_streak": {
+          "realized_mult_median": 0.9973010005497867,
+          "realized_mult_p5": 0.9780210573961621,
+          "realized_mult_p95": 1.0203358567521392,
+          "capped_pct_median": 0.0,
+          "capped_pct_max": 0.0,
+          "capped_of_wins_pct_median": 0.0,
+          "sell_rejected_pct_median": 0.08022464186921807,
+          "avg_sell_return_median": 0.9435922236900032,
+          "final_price_median": 0.0005093048635010304,
+          "price_growth_x": 38.197864762577275,
+          "final_R_median": 51804.419636860235,
+          "final_curve_tokens_median": 121350550.92104915,
+          "final_vault_median": 153330786.89395323,
+          "min_vault_median": 95776780.87634599,
+          "min_vault_p5": 82879288.0335512,
+          "min_vault_as_pct_of_seed_p5": 55.252858689034134
+        }
+      }
+    },
+    "default": {
+      "params": {
+        "V": 3000.0,
+        "vault_seed": 100000000.0,
+        "cap_bps": 2500
+      },
+      "start_price": 3.75e-06,
+      "behaviours": {
+        "hold": {
+          "realized_mult_median": 0.9526439861467167,
+          "realized_mult_p5": 0.9179011233674388,
+          "realized_mult_p95": 1.0087305355809764,
+          "capped_pct_median": 0.0,
+          "capped_pct_max": 0.01,
+          "capped_of_wins_pct_median": 0.0,
+          "sell_rejected_pct_median": 0.0,
+          "avg_sell_return_median": null,
+          "final_price_median": 0.004360537499998069,
+          "price_growth_x": 1162.8099999994852,
+          "final_R_median": 99299.99999997801,
+          "final_curve_tokens_median": 23460410.557190098,
+          "final_vault_median": 136773819.5552776,
+          "min_vault_median": 96434236.65682518,
+          "min_vault_p5": 62820970.19529173,
+          "min_vault_as_pct_of_seed_p5": 62.82097019529173
+        },
+        "half_sell": {
+          "realized_mult_median": 0.9523134345596087,
+          "realized_mult_p5": 0.9214186659835194,
+          "realized_mult_p95": 0.9892910032796243,
+          "capped_pct_median": 0.0,
+          "capped_pct_max": 0.01,
+          "capped_of_wins_pct_median": 0.0,
+          "sell_rejected_pct_median": 0.0,
+          "avg_sell_return_median": 0.9418530931035717,
+          "final_price_median": 0.0012563169343204152,
+          "price_growth_x": 335.0178491521107,
+          "final_R_median": 51910.47843868642,
+          "final_curve_tokens_median": 43707504.80133821,
+          "final_vault_median": 168324615.28189746,
+          "min_vault_median": 94474812.21384525,
+          "min_vault_p5": 54449252.04309707,
+          "min_vault_as_pct_of_seed_p5": 54.449252043097076
+        },
+        "mythic_streak": {
+          "realized_mult_median": 1.0094713121646182,
+          "realized_mult_p5": 0.9866655229131304,
+          "realized_mult_p95": 1.0284741482852975,
+          "capped_pct_median": 0.11,
+          "capped_pct_max": 0.22,
+          "capped_of_wins_pct_median": 0.44480388192478765,
+          "sell_rejected_pct_median": 0.05921832742942429,
+          "avg_sell_return_median": 0.9411837844091608,
+          "final_price_median": 0.0012590923044935119,
+          "price_growth_x": 335.7579478649365,
+          "final_R_median": 51971.09720394809,
+          "final_curve_tokens_median": 43659306.88014498,
+          "final_vault_median": 86484850.0898455,
+          "min_vault_median": 6324313.313200636,
+          "min_vault_p5": 4094023.107599433,
+          "min_vault_as_pct_of_seed_p5": 4.094023107599433
+        }
+      }
+    },
+    "aggressive": {
+      "params": {
+        "V": 1000.0,
+        "vault_seed": 50000000.0,
+        "cap_bps": 4000
+      },
+      "start_price": 1.176470588235294e-06,
+      "behaviours": {
+        "hold": {
+          "realized_mult_median": 0.9484526191208482,
+          "realized_mult_p5": 0.9003581385519838,
+          "realized_mult_p95": 1.0139170310390868,
+          "capped_pct_median": 0.0,
+          "capped_pct_max": 0.1,
+          "capped_of_wins_pct_median": 0.0,
+          "sell_rejected_pct_median": 0.0,
+          "avg_sell_return_median": null,
+          "final_price_median": 0.011835399999994816,
+          "price_growth_x": 10060.089999995595,
+          "final_R_median": 99299.99999997801,
+          "final_curve_tokens_median": 8474576.271188295,
+          "final_vault_median": 93378431.53643355,
+          "min_vault_median": 42961894.950667955,
+          "min_vault_p5": 14815198.134567106,
+          "min_vault_as_pct_of_seed_p5": 29.630396269134213
+        },
+        "half_sell": {
+          "realized_mult_median": 0.9477501288447479,
+          "realized_mult_p5": 0.8988749922550099,
+          "realized_mult_p95": 0.9938239826700891,
+          "capped_pct_median": 0.0,
+          "capped_pct_max": 0.1,
+          "capped_of_wins_pct_median": 0.0,
+          "sell_rejected_pct_median": 0.0,
+          "avg_sell_return_median": 0.941035536074642,
+          "final_price_median": 0.003291746341187586,
+          "price_growth_x": 2797.9843900094484,
+          "final_R_median": 51895.97706610684,
+          "final_curve_tokens_median": 16069274.965995539,
+          "final_vault_median": 133984407.59365678,
+          "min_vault_median": 44908616.22511658,
+          "min_vault_p5": 13739889.23233379,
+          "min_vault_as_pct_of_seed_p5": 27.479778464667582
+        },
+        "mythic_streak": {
+          "realized_mult_median": 0.9704264716327591,
+          "realized_mult_p5": 0.9366046801378631,
+          "realized_mult_p95": 1.0019798623253222,
+          "capped_pct_median": 0.13,
+          "capped_pct_max": 0.24,
+          "capped_of_wins_pct_median": 0.5040725580626125,
+          "sell_rejected_pct_median": 0.019996003997921313,
+          "avg_sell_return_median": 0.9427096878505767,
+          "final_price_median": 0.0032855503293290423,
+          "price_growth_x": 2792.717779929686,
+          "final_R_median": 51846.170711728744,
+          "final_curve_tokens_median": 16084420.024288457,
+          "final_vault_median": 97041027.65985289,
+          "min_vault_median": 302330.88,
+          "min_vault_p5": 181398.528,
+          "min_vault_as_pct_of_seed_p5": 0.362797056
+        }
+      }
+    }
+  }
+}
