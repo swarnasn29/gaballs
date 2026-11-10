@@ -1,0 +1,18 @@
+[package]
+name = "gaballs-sandbox-tests"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.95"
+license = "MIT"
+publish = false
+
+# Runs against the wasm in ../../target/near built by scripts/build-wasm.{sh,ps1}.
+# Not in the root workspace: the NEAR sandbox node only runs on Linux/macOS (on Windows use WSL).
+
+[dev-dependencies]
+near-sandbox = "0.4.0"
+near-api = "0.8"
+tokio = { version = "1.12.0", features = ["full"] }
+testresult = "0.4.1"
+serde = "1"
+serde_json = "1"

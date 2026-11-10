@@ -1,11 +1,29 @@
 [package]
 name = "gaballs-nft"
+description = "Gaballs nft contract"
 version = "0.1.0"
 edition = "2024"
+rust-version = "1.95"
 license = "MIT"
 publish = false
+repository = "https://github.com/swarnasn29/gaballs"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
 
+[package.metadata.near.reproducible_build]
+image = "sourcescan/cargo-near:0.22.0-rust-1.99.1"
+image_digest = "sha256:c9655eaf7436b90c87ea8b25739f91063032c5c30ba24cfeafe72c142943b5bb"
+passed_env = []
+container_build_command = ["cargo", "near", "build", "non-reproducible-wasm", "--locked"]
+
 [dependencies]
+near-sdk = { workspace = true }
+near-contract-standards = { workspace = true }
+
+[dev-dependencies]
+near-sdk = { workspace = true, features = ["unit-testing"] }
+
+[lints.rust.unexpected_cfgs]
+level = "warn"
+check-cfg = ['cfg(near)']

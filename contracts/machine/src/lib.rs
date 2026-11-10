@@ -21,7 +21,10 @@ use near_sdk::json_types::U128;
 use near_sdk::serde::Deserialize;
 use near_sdk::serde_json::{self, json};
 use near_sdk::store::{LazyOption, Vector};
-use near_sdk::{AccountId, BorshStorageKey, PanicOnDefault, env, near, require};
+use near_sdk::{
+    AccountId, BorshStorageKey, Gas, NearToken, PanicOnDefault, PromiseError, PromiseOrValue, env, ext_contract,
+    near, require,
+};
 
 pub use odds::Tier;
 
@@ -34,8 +37,33 @@ pub const NFT_FEE_BPS: u32 = 50;
 pub const PLATFORM_FEE_BPS: u32 = 20;
 pub const MAX_PACKS_PER_CALL: u32 = 5;
 pub const RECENT_PULLS: u32 = 50;
+#[cfg(feature = "test-hooks")]
+const FORCED_TIER_KEY: &[u8] = b"__test_forced_tier";
 
 pub const ERR_NOT_USDT: &str = "Only the machine's USDT contract can call ft_on_transfer";
+
+/// NEAR the machine attaches to a Mythic certificate mint (storage on the NFT contract; the excess is refunded).
+pub const CERT_MINT_DEPOSIT: NearToken = NearToken::from_millinear(20);
+/// NEAR (beyond what its storage locks) the machine keeps in reserve; below it, certificate mints are skipped.
+pub const MIN_OPERATING_BALANCE: NearToken = NearToken::from_millinear(100);
+const GAS_FOR_CERT_MINT: Gas = Gas::from_tgas(15);
+const GAS_FOR_FT_TRANSFER: Gas = Gas::from_tgas(10);
+const GAS_FOR_FT_TRANSFER_CALL: Gas = Gas::from_tgas(60);
+const GAS_FOR_SWEEP_CALLBACK: Gas = Gas::from_tgas(10);
+
+#[ext_contract(ext_usdt)]
+#[allow(dead_code)]
+trait Usdt {
+    fn ft_transfer(&mut self, receiver_id: AccountId, amount: U128, memo: Option<String>);
+    fn ft_transfer_call(&mut self, receiver_id: AccountId, amount: U128, memo: Option<String>, msg: String)
+    -> PromiseOrValue<U128>;
+}
+
+#[ext_contract(ext_nft)]
+#[allow(dead_code)]
+trait GaballsNft {
+    fn mint_certificate(&mut self, receiver_id: AccountId, machine: AccountId, pull_id: u64);
+}
 
 #[near]
 #[derive(BorshStorageKey)]
@@ -126,6 +154,8 @@ pub struct PullRecord {
     pub price_before: U128,
     pub price_after: U128,
     pub capped: bool,
+    /// A Mythic certificate mint was requested for this pull.
+    pub certificate: bool,
     pub seed: String,
     pub block: u64,
 }
@@ -245,9 +275,9 @@ impl Machine {
         this
     }
 
-    /// Moves accrued fees to the "swept" counters and emits `fees_swept`.
-    /// Phase 1 stub: amounts are recorded only; the USDT transfers to the Machine NFT and the platform
-    /// account (with a restore-on-failure callback) are wired in Phase 2.
+    /// Anyone can call. Sends accrued creator fees to the Machine NFT (`ft_transfer_call` to the NFT contract with
+    /// `{"token_id": "<machine nft id>"}`) and platform fees to the platform account. Accruals move to "swept"
+    /// immediately; each callback moves back whatever was not delivered, so a failed transfer loses nothing.
     pub fn sweep_fees(&mut self) -> Fees {
         let nft = self.fees.nft_accrued.0;
         let platform = self.fees.platform_accrued.0;
@@ -255,17 +285,85 @@ impl Machine {
         self.fees.platform_accrued = U128(0);
         self.fees.nft_swept = U128(self.fees.nft_swept.0 + nft);
         self.fees.platform_swept = U128(self.fees.platform_swept.0 + platform);
+
+        if nft > 0 {
+            let msg = json!({ "token_id": self.config.nft_token_id }).to_string();
+            ext_usdt::ext(self.config.usdt_contract.clone())
+                .with_attached_deposit(NearToken::from_yoctonear(1))
+                .with_static_gas(GAS_FOR_FT_TRANSFER_CALL)
+                .ft_transfer_call(self.config.nft_contract.clone(), U128(nft), Some("gaballs creator fees".into()), msg)
+                .then(
+                    Self::ext(env::current_account_id())
+                        .with_static_gas(GAS_FOR_SWEEP_CALLBACK)
+                        .on_nft_fees_swept(U128(nft)),
+                )
+                .detach();
+        }
+        if platform > 0 {
+            ext_usdt::ext(self.config.usdt_contract.clone())
+                .with_attached_deposit(NearToken::from_yoctonear(1))
+                .with_static_gas(GAS_FOR_FT_TRANSFER)
+                .ft_transfer(self.config.platform_account.clone(), U128(platform), Some("gaballs platform fees".into()))
+                .then(
+                    Self::ext(env::current_account_id())
+                        .with_static_gas(GAS_FOR_SWEEP_CALLBACK)
+                        .on_platform_fees_swept(U128(platform)),
+                )
+                .detach();
+        }
+        self.fees.clone()
+    }
+
+    /// `ft_transfer_call` returns how much the NFT contract kept; anything unused (or everything, on failure)
+    /// goes back to `nft_accrued`.
+    #[private]
+    pub fn on_nft_fees_swept(&mut self, amount: U128, #[callback_result] used: Result<U128, PromiseError>) -> U128 {
+        let delivered = used.map(|u| u.0.min(amount.0)).unwrap_or(0);
+        let undelivered = amount.0 - delivered;
+        if undelivered > 0 {
+            self.fees.nft_swept = U128(self.fees.nft_swept.0 - undelivered);
+            self.fees.nft_accrued = U128(self.fees.nft_accrued.0 + undelivered);
+        }
         events::emit(
             "fees_swept",
             &json!({
+                "to": "nft",
                 "nft_token_id": self.config.nft_token_id,
-                "nft_amount": U128(nft),
-                "platform_account": self.config.platform_account,
-                "platform_amount": U128(platform),
-                "transferred": false,
+                "amount": amount,
+                "delivered": U128(delivered),
+                "restored": U128(undelivered),
             }),
         );
-        self.fees.clone()
+        U128(delivered)
+    }
+
+    #[private]
+    pub fn on_platform_fees_swept(&mut self, amount: U128) -> U128 {
+        let delivered = if env::promise_result_checked(0, 0).is_ok() { amount.0 } else { 0 };
+        let undelivered = amount.0 - delivered;
+        if undelivered > 0 {
+            self.fees.platform_swept = U128(self.fees.platform_swept.0 - undelivered);
+            self.fees.platform_accrued = U128(self.fees.platform_accrued.0 + undelivered);
+        }
+        events::emit(
+            "fees_swept",
+            &json!({
+                "to": "platform",
+                "platform_account": self.config.platform_account,
+                "amount": amount,
+                "delivered": U128(delivered),
+                "restored": U128(undelivered),
+            }),
+        );
+        U128(delivered)
+    }
+
+    /// TEST BUILDS ONLY (`--features test-hooks`): the next pull lands on `tier` instead of its random roll.
+    /// Production wasm is built without this feature, so the method does not exist on deployed machines.
+    #[cfg(feature = "test-hooks")]
+    pub fn test_force_next_tier(&mut self, tier: u8) {
+        require!(usize::from(tier) < self.odds.len(), "no such tier");
+        env::storage_write(FORCED_TIER_KEY, &[tier]);
     }
 
     // ---------------------------------------------------------------- views
@@ -421,7 +519,13 @@ impl Machine {
         let pull_id = self.pull_nonce;
         self.pull_nonce += 1;
         let (roll, seed) = Self::draw_roll(buyer, pull_id);
-        let tier = odds::tier_for_roll(&self.odds, roll);
+        #[allow(unused_mut)]
+        let mut tier = odds::tier_for_roll(&self.odds, roll);
+        #[cfg(feature = "test-hooks")]
+        if let Some(forced) = env::storage_read(FORCED_TIER_KEY) {
+            env::storage_remove(FORCED_TIER_KEY);
+            tier = usize::from(forced[0]);
+        }
         self.settle_pack(buyer, pull_id, roll, tier, seed)
     }
 
@@ -465,7 +569,19 @@ impl Machine {
             self.token.internal_transfer(&machine_id, buyer, payout, Some("gaballs pack payout".to_string()));
         }
 
-        // 4. Stats, ring buffer, event.
+        // 4. Mythic: mint a soulbound certificate. Detached: a failed mint never undoes the token payout.
+        let certificate = tier == odds::MYTHIC && free_near_balance() >= MIN_OPERATING_BALANCE.saturating_add(CERT_MINT_DEPOSIT);
+        if certificate {
+            ext_nft::ext(self.config.nft_contract.clone())
+                .with_attached_deposit(CERT_MINT_DEPOSIT)
+                .with_static_gas(GAS_FOR_CERT_MINT)
+                .mint_certificate(buyer.clone(), machine_id.clone(), pull_id)
+                .detach();
+        } else if tier == odds::MYTHIC {
+            env::log_str("certificate mint skipped: machine NEAR balance too low");
+        }
+
+        // 5. Stats, ring buffer, event.
         self.stats.packs_opened += 1;
         self.stats.tier_counts[tier] += 1;
         self.stats.capped_pulls += u64::from(capped);
@@ -487,6 +603,7 @@ impl Machine {
             price_before: U128(price_before),
             price_after: U128(self.price()),
             capped,
+            certificate,
             seed: to_hex(&seed),
             block: env::block_height(),
         };
@@ -499,6 +616,11 @@ impl Machine {
         events::emit("pack_opened", &record);
         record
     }
+}
+
+/// NEAR not locked for storage: account balance minus storage_usage * byte cost.
+fn free_near_balance() -> NearToken {
+    env::account_balance().saturating_sub(env::storage_byte_cost().saturating_mul(u128::from(env::storage_usage())))
 }
 
 fn to_hex(bytes: &[u8]) -> String {

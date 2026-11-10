@@ -6,8 +6,7 @@ edition = "2024"
 rust-version = "1.95"
 license = "MIT"
 publish = false
-# TODO: set to the public repo URL before the final build (exposed via NEP-330 contract_source_metadata).
-repository = "https://github.com/<xxx>/<xxx>"
+repository = "https://github.com/swarnasn29/gaballs"
 
 [lib]
 crate-type = ["cdylib", "rlib"]

@@ -3,8 +3,7 @@
 use near_sdk::near;
 
 pub const BPS: u32 = 10_000;
-/// Index of the Mythic tier. Used by the certificate mint (Phase 2) and tests.
-#[allow(dead_code)]
+/// Index of the Mythic tier.
 pub const MYTHIC: usize = 3;
 
 #[near(serializers = [json, borsh])]

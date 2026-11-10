@@ -1,6 +1,8 @@
 [workspace]
 resolver = "3"
 members = ["contracts/machine", "contracts/nft", "contracts/factory", "contracts/mock-usdt"]
+# Sandbox tests run separately (the NEAR sandbox node has no Windows build): see tests/sandbox/README.md
+exclude = ["tests/sandbox"]
 
 [workspace.dependencies]
 near-sdk = "5.30.1"

@@ -793,6 +793,10 @@ dependencies = [
 [[package]]
 name = "gaballs-factory"
 version = "0.1.0"
+dependencies = [
+ "near-contract-standards",
+ "near-sdk",
+]
 
 [[package]]
 name = "gaballs-machine"
@@ -814,6 +818,10 @@ dependencies = [
 [[package]]
 name = "gaballs-nft"
 version = "0.1.0"
+dependencies = [
+ "near-contract-standards",
+ "near-sdk",
+]
 
 [[package]]
 name = "generic-array"
