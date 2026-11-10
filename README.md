@@ -45,9 +45,15 @@ _TBD — exact versions of Rust, cargo-near, near-cli-rs, Node._
 
 ### Build and test
 1. `cargo test --workspace` → `test result: ok. 23 passed` (machine) and `ok. 5 passed` (mock-usdt).
-2. `cd contracts/machine && cargo near build non-reproducible-wasm --no-abi` → `target/near/gaballs_machine/gaballs_machine.wasm`.
-   (`--no-abi` is only needed on Windows, where cargo-near's ABI step fails to link natively.)
-3. Same for `contracts/mock-usdt`.
+2. Build each contract to wasm:
+   - macOS / Linux: `cd contracts/machine && cargo near build non-reproducible-wasm`
+   - Windows: `cd contracts/machine && cargo near build non-reproducible-wasm --no-abi`
+     (cargo-near's ABI step fails to link natively on Windows; the wasm itself is identical.)
+
+   Output: `target/near/gaballs_machine/gaballs_machine.wasm`. Repeat for `contracts/mock-usdt`.
+
+Windows note: `.cargo/config.toml` sets `AWS_LC_SYS_PREBUILT_NASM_x86_64_pc_windows_msvc` so the test
+dependencies build without installing NASM. The variable is target-specific and is ignored on macOS/Linux.
 
 ## 6. Verify the trust claims
 

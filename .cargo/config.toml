@@ -1,4 +1,6 @@
 [env]
-# Windows: the unit-testing VM pulls in aws-lc-sys, which otherwise needs the NASM assembler installed.
-# This makes it use the pre-assembled objects shipped inside the crate. Ignored on other platforms.
-AWS_LC_SYS_PREBUILT_NASM = "1"
+# Windows only: the unit-testing VM pulls in aws-lc-sys, which otherwise needs the NASM assembler
+# installed. aws-lc-sys reads `AWS_LC_SYS_PREBUILT_NASM_<target>` only when building for that exact
+# target, so these lines have no effect on macOS or Linux.
+AWS_LC_SYS_PREBUILT_NASM_x86_64_pc_windows_msvc = "1"
+AWS_LC_SYS_PREBUILT_NASM_aarch64_pc_windows_msvc = "1"
