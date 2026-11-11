@@ -1,0 +1,19 @@
+[package]
+name = "gaballs-mock-outlayer"
+description = "Stand-in for OutLayer's request_execution, for Gaballs sandbox tests only. Never deployed."
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.95"
+license = "MIT"
+publish = false
+repository = "https://github.com/swarnasn29/gaballs"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+near-sdk = { workspace = true }
+
+[lints.rust.unexpected_cfgs]
+level = "warn"
+check-cfg = ['cfg(near)']

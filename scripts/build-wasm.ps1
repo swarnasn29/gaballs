@@ -1,9 +1,9 @@
 # Builds every contract to target\near\. Windows. (macOS / Linux: scripts/build-wasm.sh)
 # --no-abi: cargo-near's ABI step cannot link natively on Windows; the wasm is the same.
-# The test-hooks machine is ONLY for sandbox tests; it is never deployed.
+# The test-hooks machine and mock-outlayer are ONLY for sandbox tests; they are never deployed.
 $ErrorActionPreference = "Stop"
 Set-Location (Join-Path $PSScriptRoot "..")
-foreach ($c in "mock-usdt", "nft", "machine", "factory") {
+foreach ($c in "mock-usdt", "mock-outlayer", "nft", "machine", "factory") {
     Push-Location "contracts\$c"
     cargo near build non-reproducible-wasm --no-abi
     if ($LASTEXITCODE -ne 0) { Pop-Location; exit 1 }

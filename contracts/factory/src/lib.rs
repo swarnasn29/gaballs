@@ -17,6 +17,19 @@ mod tests;
 
 /// Raw storage key of the machine wasm (kept out of the contract state struct so it is not loaded on every call).
 const CODE_KEY: &[u8] = b"machine_code";
+/// Raw storage key of the VRF settings passed to every new machine (JSON). Outside the state struct, so adding it
+/// needed no state migration.
+const VRF_KEY: &[u8] = b"vrf_config";
+
+/// Where new machines get verifiable randomness (see the machine's `VrfConfig`).
+#[near(serializers = [json])]
+#[derive(Clone, Debug, PartialEq)]
+pub struct VrfConfig {
+    pub outlayer_contract: AccountId,
+    pub project_id: String,
+    /// 32 bytes, hex.
+    pub pubkey_hex: String,
+}
 
 // Fixed launch economics (docs/PARAMETERS.md, "Default").
 pub const PACK_PRICE: u128 = 10_000_000; // 10 USDT
@@ -144,6 +157,18 @@ impl Factory {
         env::storage_write(CODE_KEY, &code);
     }
 
+    /// Owner only. VRF settings for machines launched from now on (each machine stores its own copy at launch and
+    /// can never change it). Phase 7: locked together with `set_machine_code` before the factory's keys are deleted.
+    pub fn set_vrf_config(&mut self, vrf: VrfConfig) {
+        require!(env::predecessor_account_id() == self.owner, "Only the owner can set the VRF config");
+        require!(
+            vrf.pubkey_hex.len() == 64 && vrf.pubkey_hex.bytes().all(|b| b.is_ascii_hexdigit()),
+            "pubkey_hex must be 32 bytes of hex"
+        );
+        require!(!vrf.project_id.is_empty(), "project_id is empty");
+        env::storage_write(VRF_KEY, &near_sdk::serde_json::to_vec(&vrf).unwrap());
+    }
+
     /// Launches `<symbol>.<factory>`. Attach at least `get_launch_cost()`; the caller becomes the creator and
     /// receives the Machine NFT plus `creator_allocation` tokens (0–100M, 18 decimals).
     #[payable]
@@ -165,6 +190,7 @@ impl Factory {
         require!(!self.machines.contains_key(&machine), "A machine with this symbol already exists");
 
         let code = env::storage_read(CODE_KEY).unwrap_or_else(|| env::panic_str("Machine code not set"));
+        let vrf = self.get_vrf_config().unwrap_or_else(|| env::panic_str("VRF config not set"));
         let init_args = json!({
             "args": {
                 "name": name,
@@ -179,6 +205,7 @@ impl Factory {
                 "virtual_usdt_reserve": U128(VIRTUAL_USDT_RESERVE),
                 "vault_seed": U128(VAULT_SEED),
                 "max_vault_draw_bps": MAX_VAULT_DRAW_BPS,
+                "vrf": vrf,
             }
         });
         let machine_balance = deposit.saturating_sub(NFT_MINT_DEPOSIT).saturating_sub(USDT_STORAGE_DEPOSIT);
@@ -311,6 +338,10 @@ impl Factory {
 
     pub fn get_machine(&self, machine: AccountId) -> Option<MachineInfo> {
         self.machines.get(&machine).cloned()
+    }
+
+    pub fn get_vrf_config(&self) -> Option<VrfConfig> {
+        env::storage_read(VRF_KEY).map(|b| near_sdk::serde_json::from_slice(&b).unwrap())
     }
 
     pub fn get_config(&self) -> FactoryConfig {

@@ -15,7 +15,8 @@ const ERR_TO_MACHINE: &str = "Tokens cannot be sent to the machine account direc
 impl FungibleTokenReceiver for Machine {
     /// Pays for 1–5 packs. `msg` = `{"action":"open_pack","count":N}` and `amount` must equal
     /// `pack_price * N`. Anything invalid returns the full amount (the USDT contract refunds it).
-    /// Returns "0" when the packs were opened.
+    /// Returns "0" when the payment was accepted: the packs open when the VRF proof arrives (`pack_opened`), or the
+    /// USDT is refunded (`pack_refunded`). Watch for the `pack_requested` event's `request_id`.
     fn ft_on_transfer(&mut self, sender_id: AccountId, amount: U128, msg: String) -> PromiseOrValue<U128> {
         require!(env::predecessor_account_id() == self.config.usdt_contract, ERR_NOT_USDT);
         match self.validate_pack_request(&sender_id, amount.0, &msg) {
@@ -24,9 +25,7 @@ impl FungibleTokenReceiver for Machine {
                 PromiseOrValue::Value(amount)
             }
             Ok(count) => {
-                for _ in 0..count {
-                    self.open_one_pack(&sender_id);
-                }
+                self.request_pull(sender_id, amount.0, count);
                 PromiseOrValue::Value(U128(0))
             }
         }

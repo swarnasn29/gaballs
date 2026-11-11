@@ -38,7 +38,17 @@ fn factory_with_code() -> Factory {
     let mut f = Factory::new(owner(), acc("nft.gaballs.testnet"), acc("usdt.gaballs.testnet"), owner());
     ctx(owner(), NearToken::from_near(0), FAKE_WASM);
     f.set_machine_code();
+    ctx(owner(), NearToken::from_near(0), b"");
+    f.set_vrf_config(test_vrf());
     f
+}
+
+fn test_vrf() -> VrfConfig {
+    VrfConfig {
+        outlayer_contract: acc("outlayer.testnet"),
+        project_id: "zavodil2.testnet/vrf-ark".into(),
+        pubkey_hex: "c0c5aeae1688c2f7cc2350aae1ee3ce96eddc0de84d678db873de48268f8cfa8".into(),
+    }
 }
 
 fn launch(f: &mut Factory, symbol: &str, deposit: NearToken) {
@@ -216,4 +226,37 @@ fn retry_unknown_machine_fails() {
     let mut f = factory_with_code();
     ctx(creator(), NFT_MINT_DEPOSIT, b"");
     f.retry_machine_setup(acc("nope.gaballs.testnet"));
+}
+
+#[test]
+fn vrf_config_is_stored_and_readable() {
+    let f = factory_with_code();
+    assert_eq!(f.get_vrf_config(), Some(test_vrf()));
+}
+
+#[test]
+#[should_panic(expected = "Only the owner can set the VRF config")]
+fn set_vrf_config_owner_only() {
+    let mut f = factory_with_code();
+    ctx(creator(), NearToken::from_near(0), b"");
+    f.set_vrf_config(test_vrf());
+}
+
+#[test]
+#[should_panic(expected = "pubkey_hex must be 32 bytes of hex")]
+fn set_vrf_config_rejects_a_bad_key() {
+    let mut f = factory_with_code();
+    ctx(owner(), NearToken::from_near(0), b"");
+    f.set_vrf_config(VrfConfig { pubkey_hex: "abcd".into(), ..test_vrf() });
+}
+
+#[test]
+#[should_panic(expected = "VRF config not set")]
+fn launch_requires_vrf_config() {
+    ctx(owner(), NearToken::from_near(0), b"");
+    let mut f = Factory::new(owner(), acc("nft.gaballs.testnet"), acc("usdt.gaballs.testnet"), owner());
+    ctx(owner(), NearToken::from_near(0), FAKE_WASM);
+    f.set_machine_code();
+    let cost = f.get_launch_cost();
+    launch(&mut f, "GOLD", cost);
 }

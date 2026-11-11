@@ -6,6 +6,10 @@
 //!
 //! Token accounting: the machine's own account holds the curve inventory plus the vault, so
 //! `ft_balance_of(machine) == curve_tokens + vault` at all times and total supply never changes.
+//!
+//! Randomness (Phase 5): a paid pack becomes a *pending pull* and one OutLayer VRF request. The callback verifies
+//! the proof on-chain and settles the packs, or refunds the USDT. If no callback arrives, anyone can trigger the
+//! refund after `VRF_TIMEOUT_BLOCKS`. See `vrf.rs`.
 
 mod curve;
 mod events;
@@ -13,6 +17,7 @@ mod ft;
 mod odds;
 #[cfg(test)]
 mod tests;
+mod vrf;
 
 use near_contract_standards::fungible_token::FungibleToken;
 use near_contract_standards::fungible_token::events::FtMint;
@@ -20,10 +25,10 @@ use near_contract_standards::fungible_token::metadata::{FT_METADATA_SPEC, Fungib
 use near_sdk::json_types::U128;
 use near_sdk::serde::Deserialize;
 use near_sdk::serde_json::{self, json};
-use near_sdk::store::{LazyOption, Vector};
+use near_sdk::store::{IterableMap, LazyOption, Vector};
 use near_sdk::{
-    AccountId, BorshStorageKey, Gas, NearToken, PanicOnDefault, PromiseError, PromiseOrValue, env, ext_contract,
-    near, require,
+    AccountId, BorshStorageKey, Gas, NearToken, PanicOnDefault, Promise, PromiseError, PromiseOrValue, env,
+    ext_contract, near, require,
 };
 
 pub use odds::Tier;
@@ -39,6 +44,8 @@ pub const MAX_PACKS_PER_CALL: u32 = 5;
 pub const RECENT_PULLS: u32 = 50;
 #[cfg(feature = "test-hooks")]
 const FORCED_TIER_KEY: &[u8] = b"__test_forced_tier";
+#[cfg(feature = "test-hooks")]
+const DROP_CALLBACK_KEY: &[u8] = b"__test_drop_vrf_callback";
 
 pub const ERR_NOT_USDT: &str = "Only the machine's USDT contract can call ft_on_transfer";
 
@@ -50,6 +57,32 @@ const GAS_FOR_CERT_MINT: Gas = Gas::from_tgas(15);
 const GAS_FOR_FT_TRANSFER: Gas = Gas::from_tgas(10);
 const GAS_FOR_FT_TRANSFER_CALL: Gas = Gas::from_tgas(60);
 const GAS_FOR_SWEEP_CALLBACK: Gas = Gas::from_tgas(10);
+const GAS_FOR_SELL_CALLBACK: Gas = Gas::from_tgas(15);
+const GAS_FOR_REFUND_CALLBACK: Gas = Gas::from_tgas(10);
+
+/// NEAR attached to each OutLayer VRF request (one per pack payment). OutLayer charges what the run uses
+/// (~0.0011 NEAR on testnet) and refunds the rest to the machine.
+pub const VRF_DEPOSIT: NearToken = NearToken::from_millinear(10);
+const GAS_FOR_VRF_REQUEST: Gas = Gas::from_tgas(150);
+const GAS_FOR_VRF_CALLBACK: Gas = Gas::from_tgas(60);
+/// After this many blocks (~5 minutes) without a settled result, anyone can refund a pending pull.
+pub const VRF_TIMEOUT_BLOCKS: u64 = 300;
+/// Largest OutLayer result the callback reads.
+const MAX_VRF_RESULT_BYTES: usize = 16 * 1024;
+
+#[ext_contract(ext_outlayer)]
+#[allow(dead_code)]
+trait OutLayer {
+    fn request_execution(
+        &mut self,
+        source: near_sdk::serde_json::Value,
+        resource_limits: Option<near_sdk::serde_json::Value>,
+        input_data: Option<String>,
+        secrets_ref: Option<near_sdk::serde_json::Value>,
+        response_format: Option<String>,
+        payer_account_id: Option<AccountId>,
+    );
+}
 
 #[ext_contract(ext_usdt)]
 #[allow(dead_code)]
@@ -71,6 +104,37 @@ enum StorageKey {
     Accounts,
     Metadata,
     RecentPulls,
+    Pending,
+}
+
+/// Where verifiable randomness comes from. Fixed at launch like everything else (no setter).
+#[near(serializers = [json, borsh])]
+#[derive(Clone)]
+pub struct VrfConfig {
+    /// OutLayer contract: `outlayer.testnet` / `outlayer.near`.
+    pub outlayer_contract: AccountId,
+    /// OutLayer project that runs the VRF module, e.g. `zavodil2.testnet/vrf-ark`.
+    pub project_id: String,
+    /// OutLayer's VRF public key (32 bytes, hex), from `GET https://testnet-api.outlayer.ai/vrf/pubkey`.
+    pub pubkey_hex: String,
+}
+
+/// A paid pack waiting for its VRF proof.
+#[near(serializers = [json, borsh])]
+#[derive(Clone, Debug, PartialEq)]
+pub struct PendingPull {
+    pub request_id: u64,
+    pub buyer: AccountId,
+    pub count: u32,
+    /// USDT held for this request (pack_price * count).
+    pub usdt: U128,
+    /// The user seed sent to OutLayer; the proof's alpha must end in it.
+    pub seed: String,
+    pub requested_at_block: u64,
+    /// Block from which anyone can call `refund_expired`.
+    pub refundable_from_block: u64,
+    /// A refund transfer was attempted and failed; `refund_expired` can retry it.
+    pub refund_failed: bool,
 }
 
 /// Launch arguments. Everything here is fixed forever once `new` runs: there are no setters.
@@ -93,6 +157,7 @@ pub struct LaunchArgs {
     pub vault_seed: U128,
     /// Largest share of the current vault a single winning pull may take. Default 2,500 (25%).
     pub max_vault_draw_bps: u32,
+    pub vrf: VrfConfig,
 }
 
 #[near(serializers = [json, borsh])]
@@ -112,6 +177,8 @@ pub struct Config {
     pub nft_fee_bps: u32,
     pub platform_fee_bps: u32,
     pub launched_at_block: u64,
+    pub vrf: VrfConfig,
+    pub vrf_timeout_blocks: u64,
 }
 
 #[near(serializers = [json, borsh])]
@@ -136,6 +203,15 @@ pub struct Stats {
     /// Highest multiplier actually paid (payout / bought, in bps, after any vault cap). 0 before the first pull.
     pub best_multiplier_bps: u32,
     pub best_pull_id: Option<u64>,
+    /// Pack payments refunded because the VRF result failed, did not verify, or timed out.
+    pub refunds: u64,
+    pub total_usdt_refunded: U128,
+    pub sells: u64,
+    pub total_tokens_sold: U128,
+    /// USDT taken out of the curve by sells, before fees.
+    pub total_sell_usdt_gross: U128,
+    /// USDT actually paid to sellers (gross minus fees).
+    pub total_sell_usdt_paid: U128,
 }
 
 /// One pull, as stored in the recent-pulls ring buffer and emitted in `pack_opened`.
@@ -159,8 +235,14 @@ pub struct PullRecord {
     pub capped: bool,
     /// A Mythic certificate mint was requested for this pull.
     pub certificate: bool,
+    /// h_i = SHA-256(SHA-256(vrf_signature) ++ [i]); roll = first 8 bytes mod 10,000 (see vrf.rs).
     pub seed: String,
     pub block: u64,
+    /// The pending request this pull settled (several pulls share one when a payment buys up to 5 packs).
+    pub request_id: u64,
+    /// The VRF proof: anyone can check ed25519_verify(vrf_signature, vrf_alpha, config.vrf.pubkey_hex).
+    pub vrf_alpha: String,
+    pub vrf_signature: String,
 }
 
 #[near(contract_state)]
@@ -179,6 +261,12 @@ pub struct Machine {
     stats: Stats,
     recent_pulls: Vector<PullRecord>,
     pull_nonce: u64,
+    /// VRF public key bytes (from config.vrf.pubkey_hex).
+    vrf_pubkey: [u8; 32],
+    pending: IterableMap<u64, PendingPull>,
+    /// USDT held for pending pulls (not yet in the curve or fees).
+    pending_usdt: u128,
+    request_nonce: u64,
 }
 
 #[derive(Deserialize)]
@@ -203,6 +291,10 @@ impl Machine {
             args.max_vault_draw_bps > 0 && args.max_vault_draw_bps <= odds::BPS,
             "max_vault_draw_bps must be in 1..=10000"
         );
+        let vrf_pubkey: [u8; 32] = vrf::from_hex(&args.vrf.pubkey_hex)
+            .and_then(|b| b.try_into().ok())
+            .unwrap_or_else(|| env::panic_str("vrf.pubkey_hex must be 32 bytes of hex"));
+        require!(!args.vrf.project_id.is_empty(), "vrf.project_id is empty");
 
         let metadata = FungibleTokenMetadata {
             spec: FT_METADATA_SPEC.to_string(),
@@ -235,6 +327,8 @@ impl Machine {
             nft_fee_bps: NFT_FEE_BPS,
             platform_fee_bps: PLATFORM_FEE_BPS,
             launched_at_block: env::block_height(),
+            vrf: args.vrf,
+            vrf_timeout_blocks: VRF_TIMEOUT_BLOCKS,
         };
 
         let mut this = Self {
@@ -248,6 +342,10 @@ impl Machine {
             fees: Fees::default(),
             recent_pulls: Vector::new(StorageKey::RecentPulls),
             pull_nonce: 0,
+            vrf_pubkey,
+            pending: IterableMap::new(StorageKey::Pending),
+            pending_usdt: 0,
+            request_nonce: 0,
             config,
         };
 
@@ -361,12 +459,198 @@ impl Machine {
         U128(delivered)
     }
 
+    // ---------------------------------------------------------------- VRF settlement
+
+    /// OutLayer's answer for `request_id`. Never panics: a missing, malformed or unverifiable proof refunds the
+    /// USDT. A request that was already settled or refunded (duplicate or late callback) is ignored.
+    /// Returns true when the packs were opened.
+    #[private]
+    pub fn on_vrf_result(&mut self, request_id: u64) -> bool {
+        let Some(pending) = self.pending.remove(&request_id) else {
+            env::log_str(&format!("VRF result for request {request_id} ignored: not pending (already settled or refunded)"));
+            return false;
+        };
+        self.pending_usdt -= pending.usdt.0;
+        let machine = env::current_account_id();
+        let checked = match env::promise_result_checked(0, MAX_VRF_RESULT_BYTES) {
+            Ok(raw) => vrf::verify(&raw, &self.vrf_pubkey, &pending.buyer, &machine, &pending.seed),
+            Err(_) => Err("OutLayer VRF request failed".to_string()),
+        };
+        let proof = match checked {
+            Ok(proof) => proof,
+            Err(reason) => {
+                self.refund(pending, &reason);
+                return false;
+            }
+        };
+        // The curve may have moved since the request; refund rather than settle a pack that buys nothing.
+        if let Err(reason) = self.check_curve_for(pending.count) {
+            self.refund(pending, &reason);
+            return false;
+        }
+        let rolls = vrf::rolls(&proof.signature, pending.count);
+        let signature_hex = to_hex(&proof.signature);
+        for (roll, h) in rolls {
+            let pull_id = self.pull_nonce;
+            self.pull_nonce += 1;
+            #[allow(unused_mut)]
+            let mut tier = odds::tier_for_roll(&self.odds, roll);
+            #[cfg(feature = "test-hooks")]
+            if let Some(forced) = env::storage_read(FORCED_TIER_KEY) {
+                env::storage_remove(FORCED_TIER_KEY);
+                tier = usize::from(forced[0]);
+            }
+            let vrf = VrfInfo { request_id, alpha: proof.alpha.clone(), signature_hex: signature_hex.clone() };
+            self.settle_pack(&pending.buyer, pull_id, roll, tier, h, vrf);
+        }
+        true
+    }
+
+    /// Anyone can call once `refundable_from_block` has passed (or to retry a refund whose transfer failed):
+    /// returns the pending pull's USDT to the buyer. A VRF result arriving later is ignored.
+    pub fn refund_expired(&mut self, request_id: u64) {
+        let pending = self.pending.get(&request_id).cloned().unwrap_or_else(|| env::panic_str("no such pending pull"));
+        require!(
+            pending.refund_failed || env::block_height() >= pending.refundable_from_block,
+            format!("not refundable before block {}", pending.refundable_from_block)
+        );
+        self.pending.remove(&request_id);
+        self.pending_usdt -= pending.usdt.0;
+        self.refund(pending, "VRF timeout");
+    }
+
+    /// The refund transfer's result. On failure the pull goes back to pending (flagged), so `refund_expired` can
+    /// retry it at once; nothing is lost.
+    #[private]
+    pub fn on_refund_sent(&mut self, pending: PendingPull, reason: String) -> bool {
+        let ok = env::promise_result_checked(0, 0).is_ok();
+        if ok {
+            self.stats.refunds += 1;
+            self.stats.total_usdt_refunded = U128(self.stats.total_usdt_refunded.0 + pending.usdt.0);
+        } else {
+            self.pending_usdt += pending.usdt.0;
+            self.pending.insert(pending.request_id, PendingPull { refund_failed: true, ..pending.clone() });
+        }
+        events::emit(
+            "pack_refunded",
+            &json!({
+                "request_id": pending.request_id,
+                "buyer": pending.buyer,
+                "count": pending.count,
+                "usdt": pending.usdt,
+                "reason": reason,
+                "delivered": ok,
+            }),
+        );
+        ok
+    }
+
+    // ---------------------------------------------------------------- sell-back
+
+    /// Sells `amount` tokens back to the curve. usdt_out = (V+R) - (V+R)*T/(T+s) (seller gets the floor); the sale is
+    /// rejected if usdt_out > R. Fees (0.5% Machine NFT, 0.2% platform) come out of usdt_out; the seller receives the
+    /// rest, which must be at least `min_usdt_out` (slippage guard). Attach 1 yoctoNEAR. If the USDT transfer fails,
+    /// the callback restores the curve and fees and returns the tokens.
+    #[payable]
+    pub fn sell(&mut self, amount: U128, min_usdt_out: U128) -> Promise {
+        near_sdk::assert_one_yocto();
+        let seller = env::predecessor_account_id();
+        let machine = env::current_account_id();
+        require!(seller != machine, "the machine cannot sell to itself");
+        require!(amount.0 > 0, "amount must be positive");
+        let q = self.quote_sell_inner(amount.0).unwrap_or_else(|e| env::panic_str(&e));
+        require!(
+            q.usdt_out >= min_usdt_out.0,
+            format!("slippage: would receive {} USDT units, below min_usdt_out {}", q.usdt_out, min_usdt_out.0)
+        );
+
+        let price_before = self.price();
+        // Tokens go back into the machine's balance (curve inventory). Panics if the seller has too few.
+        self.token.internal_transfer(&seller, &machine, amount.0, Some("gaballs sell".to_string()));
+        self.curve_tokens += amount.0;
+        self.curve_usdt -= q.usdt_gross;
+        self.fees.nft_accrued = U128(self.fees.nft_accrued.0 + q.nft_fee);
+        self.fees.platform_accrued = U128(self.fees.platform_accrued.0 + q.platform_fee);
+        self.stats.sells += 1;
+        self.stats.total_tokens_sold = U128(self.stats.total_tokens_sold.0 + amount.0);
+        self.stats.total_sell_usdt_gross = U128(self.stats.total_sell_usdt_gross.0 + q.usdt_gross);
+        self.stats.total_sell_usdt_paid = U128(self.stats.total_sell_usdt_paid.0 + q.usdt_out);
+
+        events::emit(
+            "tokens_sold",
+            &json!({
+                "seller": seller,
+                "amount": amount,
+                "usdt_gross": U128(q.usdt_gross),
+                "nft_fee": U128(q.nft_fee),
+                "platform_fee": U128(q.platform_fee),
+                "usdt_out": U128(q.usdt_out),
+                "price_before": U128(price_before),
+                "price_after": U128(self.price()),
+                "block": env::block_height(),
+            }),
+        );
+
+        ext_usdt::ext(self.config.usdt_contract.clone())
+            .with_attached_deposit(NearToken::from_yoctonear(1))
+            .with_static_gas(GAS_FOR_FT_TRANSFER)
+            .ft_transfer(seller.clone(), U128(q.usdt_out), Some("gaballs sell".into()))
+            .then(Self::ext(machine).with_static_gas(GAS_FOR_SELL_CALLBACK).on_sell_transfer(
+                seller,
+                amount,
+                U128(q.usdt_gross),
+                U128(q.nft_fee),
+                U128(q.platform_fee),
+            ))
+    }
+
+    /// Returns the USDT paid to the seller (0 if the transfer failed and the sale was undone).
+    #[private]
+    pub fn on_sell_transfer(
+        &mut self,
+        seller: AccountId,
+        amount: U128,
+        usdt_gross: U128,
+        nft_fee: U128,
+        platform_fee: U128,
+    ) -> U128 {
+        let paid = usdt_gross.0 - nft_fee.0 - platform_fee.0;
+        if env::promise_result_checked(0, 0).is_ok() {
+            return U128(paid);
+        }
+        // Undo. Fees swept in the meantime already left the machine; only what is still accrued can be pulled back,
+        // and the curve gets back exactly the USDT still held for this sale.
+        let nft_back = nft_fee.0.min(self.fees.nft_accrued.0);
+        let platform_back = platform_fee.0.min(self.fees.platform_accrued.0);
+        self.fees.nft_accrued = U128(self.fees.nft_accrued.0 - nft_back);
+        self.fees.platform_accrued = U128(self.fees.platform_accrued.0 - platform_back);
+        self.curve_usdt += paid + nft_back + platform_back;
+        self.curve_tokens -= amount.0;
+        self.token.internal_transfer(&env::current_account_id(), &seller, amount.0, Some("gaballs sell undone".into()));
+        self.stats.sells -= 1;
+        self.stats.total_tokens_sold = U128(self.stats.total_tokens_sold.0 - amount.0);
+        self.stats.total_sell_usdt_gross = U128(self.stats.total_sell_usdt_gross.0 - usdt_gross.0);
+        self.stats.total_sell_usdt_paid = U128(self.stats.total_sell_usdt_paid.0 - paid);
+        events::emit(
+            "sell_undone",
+            &json!({ "seller": seller, "amount": amount, "usdt_gross": usdt_gross, "reason": "USDT transfer failed" }),
+        );
+        U128(0)
+    }
+
     /// TEST BUILDS ONLY (`--features test-hooks`): the next pull lands on `tier` instead of its random roll.
     /// Production wasm is built without this feature, so the method does not exist on deployed machines.
     #[cfg(feature = "test-hooks")]
     pub fn test_force_next_tier(&mut self, tier: u8) {
         require!(usize::from(tier) < self.odds.len(), "no such tier");
         env::storage_write(FORCED_TIER_KEY, &[tier]);
+    }
+
+    /// TEST BUILDS ONLY: the next VRF request is sent without a callback, so its pull stays pending. Lets the
+    /// sandbox test the "no callback ever arrives" timeout refund, which a healthy chain never produces on its own.
+    #[cfg(feature = "test-hooks")]
+    pub fn test_drop_next_vrf_callback(&mut self) {
+        env::storage_write(DROP_CALLBACK_KEY, &[1]);
     }
 
     // ---------------------------------------------------------------- views
@@ -388,7 +672,36 @@ impl Machine {
             fees: self.fees.clone(),
             stats: self.stats.clone(),
             pull_nonce: self.pull_nonce,
+            pending_usdt: U128(self.pending_usdt),
+            pending_count: self.pending.len(),
+            request_nonce: self.request_nonce,
         }
+    }
+
+    /// What selling `amount` tokens would pay right now: gross USDT out of the curve, fees, and what the seller
+    /// receives. Fails (with the reason) if the curve does not hold enough real USDT.
+    pub fn quote_sell(&self, amount: U128) -> SellQuote {
+        let q = self.quote_sell_inner(amount.0).unwrap_or_else(|e| env::panic_str(&e));
+        SellQuote {
+            amount,
+            usdt_gross: U128(q.usdt_gross),
+            nft_fee: U128(q.nft_fee),
+            platform_fee: U128(q.platform_fee),
+            usdt_out: U128(q.usdt_out),
+            price_after: U128(q.price_after),
+        }
+    }
+
+    /// Pending pulls, oldest first; only `account_id`'s if given.
+    pub fn get_pending(&self, account_id: Option<AccountId>) -> Vec<PendingPull> {
+        let mut out: Vec<PendingPull> =
+            self.pending.values().filter(|p| account_id.as_ref().is_none_or(|a| &p.buyer == a)).cloned().collect();
+        out.sort_by_key(|p| p.request_id);
+        out
+    }
+
+    pub fn get_pending_pull(&self, request_id: u64) -> Option<PendingPull> {
+        self.pending.get(&request_id).cloned()
     }
 
     pub fn get_odds(&self) -> OddsView {
@@ -452,6 +765,39 @@ pub struct MachineView {
     pub fees: Fees,
     pub stats: Stats,
     pub pull_nonce: u64,
+    /// USDT held for pulls waiting for their VRF proof.
+    pub pending_usdt: U128,
+    pub pending_count: u32,
+    pub request_nonce: u64,
+}
+
+#[near(serializers = [json])]
+#[derive(Debug, PartialEq)]
+pub struct SellQuote {
+    pub amount: U128,
+    /// USDT leaving the curve, before fees.
+    pub usdt_gross: U128,
+    pub nft_fee: U128,
+    pub platform_fee: U128,
+    /// What the seller receives.
+    pub usdt_out: U128,
+    pub price_after: U128,
+}
+
+/// Sell maths in plain integers (see `quote_sell_inner`).
+pub(crate) struct SellCalc {
+    pub usdt_gross: u128,
+    pub nft_fee: u128,
+    pub platform_fee: u128,
+    pub usdt_out: u128,
+    pub price_after: u128,
+}
+
+/// The VRF proof a set of pulls was settled with.
+pub(crate) struct VrfInfo {
+    pub request_id: u64,
+    pub alpha: String,
+    pub signature_hex: String,
 }
 
 #[near(serializers = [json])]
@@ -515,10 +861,19 @@ impl Machine {
         if buyer == &env::current_account_id() {
             return Err("the machine cannot buy from itself".to_string());
         }
-        // A curve that is nearly sold out could give 0 tokens for a pack; refund instead of panicking.
+        self.check_curve_for(req.count)?;
+        // The machine pays OutLayer from its own NEAR; without enough, refund now rather than strand the USDT.
+        if free_near_balance() < MIN_OPERATING_BALANCE.saturating_add(VRF_DEPOSIT) {
+            return Err("machine NEAR balance too low to pay for VRF (anyone can top it up)".to_string());
+        }
+        Ok(req.count)
+    }
+
+    /// A curve that is nearly sold out could give 0 tokens for a pack; refund instead of panicking.
+    fn check_curve_for(&self, count: u32) -> Result<(), String> {
         let (_, _, to_curve) = self.split_pack_price();
         let (v, mut r, mut t) = (self.config.virtual_usdt_reserve.0, self.curve_usdt, self.curve_tokens);
-        for _ in 0..req.count {
+        for _ in 0..count {
             let b = curve::tokens_out(v, r, t, to_curve);
             if b == 0 {
                 return Err("curve inventory too low for this pack".to_string());
@@ -526,37 +881,87 @@ impl Machine {
             r += to_curve;
             t -= b;
         }
-        Ok(req.count)
+        Ok(())
     }
 
-    /// The only source of randomness. seed = sha256(random_seed ++ buyer ++ nonce);
-    /// roll = first 8 bytes of the seed as a big-endian u64, mod 10,000.
-    /// Phase 5 swaps this for OutLayer VRF without touching anything else.
-    pub(crate) fn draw_roll(buyer: &AccountId, nonce: u64) -> (u16, [u8; 32]) {
-        let mut data = env::random_seed();
-        data.extend_from_slice(buyer.as_bytes());
-        data.extend_from_slice(&nonce.to_le_bytes());
-        let seed = env::sha256_array(&data);
-        let first8: [u8; 8] = seed[..8].try_into().unwrap();
-        ((u64::from_be_bytes(first8) % u64::from(odds::BPS)) as u16, seed)
-    }
+    /// Records a pending pull for a validated payment and asks OutLayer for one VRF proof. The USDT stays with the
+    /// machine (ft_on_transfer returns 0); `on_vrf_result` settles it or refunds it.
+    pub(crate) fn request_pull(&mut self, buyer: AccountId, usdt: u128, count: u32) -> PendingPull {
+        let request_id = self.request_nonce;
+        self.request_nonce += 1;
+        let machine = env::current_account_id();
+        let block = env::block_height();
+        let pending = PendingPull {
+            request_id,
+            buyer,
+            count,
+            usdt: U128(usdt),
+            seed: vrf::seed_for(&machine, request_id),
+            requested_at_block: block,
+            refundable_from_block: block + VRF_TIMEOUT_BLOCKS,
+            refund_failed: false,
+        };
+        self.pending.insert(request_id, pending.clone());
+        self.pending_usdt += usdt;
+        events::emit("pack_requested", &pending);
 
-    fn open_one_pack(&mut self, buyer: &AccountId) -> PullRecord {
-        let pull_id = self.pull_nonce;
-        self.pull_nonce += 1;
-        let (roll, seed) = Self::draw_roll(buyer, pull_id);
-        #[allow(unused_mut)]
-        let mut tier = odds::tier_for_roll(&self.odds, roll);
+        let input = json!({ "seed": pending.seed, "max": odds::BPS - 1 }).to_string();
+        let request = ext_outlayer::ext(self.config.vrf.outlayer_contract.clone())
+            .with_attached_deposit(VRF_DEPOSIT)
+            .with_static_gas(GAS_FOR_VRF_REQUEST)
+            .request_execution(
+                json!({ "Project": { "project_id": self.config.vrf.project_id } }),
+                Some(json!({ "max_instructions": 1_000_000_000u64, "max_memory_mb": 128, "max_execution_seconds": 30 })),
+                Some(input),
+                None,
+                Some("Json".to_string()),
+                None,
+            );
         #[cfg(feature = "test-hooks")]
-        if let Some(forced) = env::storage_read(FORCED_TIER_KEY) {
-            env::storage_remove(FORCED_TIER_KEY);
-            tier = usize::from(forced[0]);
+        if env::storage_remove(DROP_CALLBACK_KEY) {
+            request.detach();
+            return pending;
         }
-        self.settle_pack(buyer, pull_id, roll, tier, seed)
+        request.then(Self::ext(machine).with_static_gas(GAS_FOR_VRF_CALLBACK).on_vrf_result(request_id)).detach();
+        pending
+    }
+
+    /// Sends a pending pull's USDT back to the buyer. The caller has already removed it from `pending`.
+    fn refund(&mut self, pending: PendingPull, reason: &str) {
+        env::log_str(&format!("refund request {}: {reason}", pending.request_id));
+        ext_usdt::ext(self.config.usdt_contract.clone())
+            .with_attached_deposit(NearToken::from_yoctonear(1))
+            .with_static_gas(GAS_FOR_FT_TRANSFER)
+            .ft_transfer(pending.buyer.clone(), pending.usdt, Some("gaballs pack refund".into()))
+            .then(
+                Self::ext(env::current_account_id())
+                    .with_static_gas(GAS_FOR_REFUND_CALLBACK)
+                    .on_refund_sent(pending, reason.to_string()),
+            )
+            .detach();
+    }
+
+    pub(crate) fn quote_sell_inner(&self, amount: u128) -> Result<SellCalc, String> {
+        if amount == 0 {
+            return Err("amount must be positive".to_string());
+        }
+        let (v, r, t) = (self.config.virtual_usdt_reserve.0, self.curve_usdt, self.curve_tokens);
+        let usdt_gross = curve::usdt_out(v, r, t, amount);
+        if usdt_gross > r {
+            return Err(format!("the curve holds only {r} USDT units; this sale needs {usdt_gross}"));
+        }
+        let nft_fee = curve::bps_of(usdt_gross, self.config.nft_fee_bps);
+        let platform_fee = curve::bps_of(usdt_gross, self.config.platform_fee_bps);
+        let usdt_out = usdt_gross - nft_fee - platform_fee;
+        if usdt_out == 0 {
+            return Err("this sale is too small to pay out any USDT".to_string());
+        }
+        let price_after = curve::price_wad(v, r - usdt_gross, t + amount);
+        Ok(SellCalc { usdt_gross, nft_fee, platform_fee, usdt_out, price_after })
     }
 
     /// Buys on the curve, applies the tier multiplier against the vault, pays the buyer and records the
-    /// pull. Callers must have run `validate_pack_request`; nothing in here can panic for a valid request.
+    /// pull. Callers must have checked the curve (`check_curve_for`); nothing in here can panic for a valid request.
     pub(crate) fn settle_pack(
         &mut self,
         buyer: &AccountId,
@@ -564,6 +969,7 @@ impl Machine {
         roll: u16,
         tier: usize,
         seed: [u8; 32],
+        vrf: VrfInfo,
     ) -> PullRecord {
         let (nft_fee, platform_fee, to_curve) = self.split_pack_price();
         self.fees.nft_accrued = U128(self.fees.nft_accrued.0 + nft_fee);
@@ -637,6 +1043,9 @@ impl Machine {
             certificate,
             seed: to_hex(&seed),
             block: env::block_height(),
+            request_id: vrf.request_id,
+            vrf_alpha: vrf.alpha,
+            vrf_signature: vrf.signature_hex,
         };
         let slot = (pull_id % u64::from(RECENT_PULLS)) as u32;
         if slot < self.recent_pulls.len() {

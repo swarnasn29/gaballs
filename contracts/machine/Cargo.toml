@@ -28,6 +28,8 @@ uint = { workspace = true }
 
 [dev-dependencies]
 near-sdk = { workspace = true, features = ["unit-testing"] }
+# Unit tests sign VRF proofs with a test key, standing in for OutLayer.
+ed25519-dalek = "2.2"
 
 [lints.rust.unexpected_cfgs]
 level = "warn"

@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["contracts/machine", "contracts/nft", "contracts/factory", "contracts/mock-usdt"]
+members = ["contracts/machine", "contracts/nft", "contracts/factory", "contracts/mock-usdt", "contracts/mock-outlayer"]
 # Sandbox tests run separately (the NEAR sandbox node has no Windows build): see tests/sandbox/README.md
 exclude = ["tests/sandbox"]
 

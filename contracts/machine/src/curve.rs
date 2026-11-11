@@ -24,6 +24,16 @@ pub fn tokens_out(v: u128, r: u128, t: u128, usdt_in: u128) -> u128 {
     (t - new_t).as_u128()
 }
 
+/// USDT out (before fees) for selling `tokens_in` back to the curve.
+/// usdt_out = (V+R) - ceil((V+R)*T / (T+s)): the curve's remaining V+R is rounded up, so the seller gets the floor.
+/// The caller must still reject the sale if usdt_out > R (only real USDT can be paid out).
+pub fn usdt_out(v: u128, r: u128, t: u128, tokens_in: u128) -> u128 {
+    let k = U256::from(v) + U256::from(r);
+    let denom = U256::from(t) + U256::from(tokens_in);
+    let new_k = (k * U256::from(t) + denom - U256::one()) / denom;
+    (k - new_k).as_u128()
+}
+
 /// Spot price: USDT per whole token, scaled by 10^18 (saturates at u128::MAX).
 pub fn price_wad(v: u128, r: u128, t: u128) -> u128 {
     if t == 0 {
