@@ -39,10 +39,34 @@ Re-run the simulation: see [sim/README.md](sim/README.md).
 | Machine + token (one per launch) | _TBD_ | `contracts/machine` | NEP-141/145/148 memecoin + bonding curve + gacha pulls + prize vault; `sweep_fees()` sends fees to the NFT |
 | NFT (Machine NFT + Mythic certificates) | _TBD_ | `contracts/nft` | NEP-171/177/178/181; Machine NFTs hold a USDT fee balance only the current owner can claim; certificates are soulbound |
 | Mock USDT (testnet) | _TBD_ | `contracts/mock-usdt` | NEP-141, 6 decimals, `faucet()` = 100 USDT per account per hour |
+| OutLayer (external, not ours) | `outlayer.testnet`, project `zavodil2.testnet/vrf-ark` | [out-layer/vrf-example](https://github.com/out-layer/vrf-example) | Runs the VRF module; returns an Ed25519 signature over `vrf:{request_id}:{buyer}:{seed}` |
 
 How the money flows: buyer → `usdt.ft_transfer_call(machine, 10 USDT)` → machine keeps 9.93 USDT in its curve, accrues
 0.05 USDT for the Machine NFT and 0.02 USDT for the platform → `sweep_fees()` → `usdt.ft_transfer_call(nft, fees,
 {"token_id":"machine:<machine>"})` → the NFT contract credits that token → its current owner calls `claim`.
+
+**Randomness (OutLayer VRF).** Paying for packs does not roll anything yet: `ft_on_transfer` records a *pending pull*
+(event `pack_requested`) and asks OutLayer for one VRF proof (the machine pays ~0.0012 NEAR from its own balance;
+unused deposit is refunded to it). OutLayer's worker signs `alpha = vrf:{request_id}:{buyer}:{machine}-{n}` with its VRF
+key. About a minute later the machine's callback checks, on-chain:
+
+1. `env::ed25519_verify(signature, alpha, pubkey)` against the OutLayer public key fixed at launch
+   (`get_machine().config.vrf.pubkey_hex`, fetched from `https://testnet-api.outlayer.ai/vrf/pubkey` at deploy time);
+2. that `alpha` is for this buyer and this pull's unique seed (a valid proof from another request is rejected);
+3. then rolls pack *i* as `SHA-256(SHA-256(signature) ++ [i])`, first 8 bytes mod 10,000. OutLayer's own `value`
+   field is ignored.
+
+Any failure refunds the USDT (`pack_refunded`, never a panic). If no answer arrives, anyone can call
+`refund_expired(request_id)` after 300 blocks (~5 minutes). Each pull stores its `vrf_alpha` and `vrf_signature`, and
+the app's "Verifiable randomness proof" link (`/proof`) re-checks both in the browser.
+
+**Sell-back.** `sell(amount, min_usdt_out)` (attach 1 yoctoNEAR) returns tokens to the curve at
+`usdt_out = (V+R) - (V+R)·T/(T+s)` (seller gets the floor), takes the same 0.5% + 0.2% fees out of it, and fails if the
+curve would need more USDT than it holds or if the payout is below `min_usdt_out`. `quote_sell(amount)` shows the numbers
+first. If the USDT transfer fails, the callback puts the tokens, curve and fees back.
+
+Machines launched before Phase 5 (`gball`, `lfg`, `lfgg`) keep block randomness and have no sell-back: they are keyless
+and can never be upgraded, so the app labels them "v1 · block randomness".
 
 ## 5. Reproduce locally
 
@@ -59,7 +83,7 @@ _TBD — exact versions of Rust, cargo-near, near-cli-rs, Node._
    Output: `target/near/{gaballs_factory,gaballs_machine,gaballs_nft,gaballs_mock_usdt}/*.wasm`, plus
    `target/near/machine_test_hooks/gaballs_machine.wasm` (sandbox tests only, never deployed).
 3. Sandbox integration tests (Linux/macOS, or WSL on Windows): `cd tests/sandbox && cargo test -- --nocapture --test-threads=1`
-   → `test result: ok. 2 passed`. See [tests/sandbox/README.md](tests/sandbox/README.md).
+   → `test result: ok. 5 passed`. See [tests/sandbox/README.md](tests/sandbox/README.md).
 
 Windows note: `.cargo/config.toml` sets `AWS_LC_SYS_PREBUILT_NASM_x86_64_pc_windows_msvc` so the test
 dependencies build without installing NASM. The variable is target-specific and is ignored on macOS/Linux.
@@ -96,6 +120,18 @@ empty stub, and the post-build check fails the build if any trace remains.
 
 _TBD — e.g. `near account list-keys <machine>.testnet` shows no full-access key; odds readable via `get_odds`._
 
+**Check a pull's randomness yourself** (any Phase 5 machine, e.g. `gumball.gaballs.testnet`):
+
+1. `near contract call-function as-read-only gumball.gaballs.testnet get_recent_pulls json-args '{}' network-config testnet now`
+   → each pull has `vrf_alpha`, `vrf_signature`, `roll`, `request_id`.
+2. `curl -s https://testnet-api.outlayer.ai/vrf/pubkey` → the same key as `get_machine().config.vrf.pubkey_hex`.
+3. In Node (no packages needed), with `A` = the alpha, `S` = the signature hex, `K` = the key hex:
+   `node -e "const c=require('crypto');const k=c.createPublicKey({key:Buffer.concat([Buffer.from('302a300506032b6570032100','hex'),Buffer.from(K,'hex')]),format:'der',type:'spki'});console.log(c.verify(null,Buffer.from(A),k,Buffer.from(S,'hex')))"`
+   → `true`. The roll: `SHA-256(SHA-256(sig bytes) ++ [i])`, first 8 bytes big-endian mod 10,000, where `i` is the
+   pull's position within its request.
+
+Or open the pull's "Verifiable randomness proof" link in the app, which runs the same checks in the browser.
+
 ## 7. Deployments and transaction links
 
 See [docs/DEPLOYMENTS.md](docs/DEPLOYMENTS.md).
@@ -108,6 +144,9 @@ See [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md).
 
 - near-sdk 5.30.1 and near-contract-standards 5.30.1 (NEP-141/145/148 implementation) — contracts
 - uint 0.10.2 — 256-bit integers for the curve maths
+- OutLayer VRF (outlayer.testnet, the OutLayer team's `zavodil2.testnet/vrf-ark` project) — verifiable randomness;
+  the request/callback pattern follows [out-layer/vrf-example](https://github.com/out-layer/vrf-example)
+- ed25519-dalek 2.2 — tests only: signs stand-in VRF proofs (unit tests, `contracts/mock-outlayer` sandbox tests)
 - near-sandbox 0.4.0 + near-api 0.8 — sandbox integration tests (`tests/sandbox`)
 - Next.js 16, React 19, Tailwind CSS 4, Motion 14 — frontend (`app/`, scaffolded with `create-next-app`)
 - @hot-labs/near-connect 0.11 + near-api-js 7 — wallet connection (per the NEAR `near-dapp` agent skill and the
@@ -125,8 +164,8 @@ See [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md).
 Only after the README steps above have been verified on a fresh clone:
 
 - [ ] Delete the access keys on the NFT contract account and the factory account.
-- [ ] Make sure no owner-only method can still change anything afterwards (e.g. `set_machine_code` becomes
-      one-time-only or the owner role is removed). Report any owner method that remains.
+- [ ] Make sure no owner-only method can still change anything afterwards (e.g. `set_machine_code` and
+      `set_vrf_config` become one-time-only or the owner role is removed). Report any owner method that remains.
 - [ ] Add a judge command that shows every contract account has no access keys, e.g.
       `near account list-keys <account> network-config testnet now` for the factory, NFT, mock USDT and each machine.
 

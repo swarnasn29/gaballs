@@ -522,3 +522,19 @@ async fn sell_back_on_chain() -> TestResult {
     println!("sold {amount} token units for {usdt_out} USDT units (quote {}); slippage-guarded attempt FAILED as intended", q["usdt_out"]);
     Ok(())
 }
+
+#[tokio::test]
+async fn longest_symbol_launch_mints_the_machine_nft() -> TestResult {
+    // Regression: the Machine NFT's storage grows with the machine account's length. A 12-character symbol (the
+    // maximum) must still mint in the launch itself, without retry_machine_setup.
+    let env = setup(wasm("gaballs_machine/gaballs_machine.wasm")).await?;
+    let cost: NearToken = env.view(&env.factory, "get_launch_cost", json!({})).await;
+    let args = json!({ "name": "A machine with a rather long name for its card", "symbol": "ABCDEFGHIJKL", "icon": null, "creator_allocation": "0" });
+    env.ok(&env.creator, &env.factory, "launch", args, cost).await;
+    let machine = id(&format!("abcdefghijkl.{}", env.factory));
+    let info: Value = env.view(&env.factory, "get_machine", json!({ "machine": machine })).await;
+    assert_eq!(info["nft_minted"], true, "Machine NFT minted at launch: {info}");
+    assert_eq!(info["usdt_registered"], true);
+    println!("12-character symbol launched with cost {cost}: nft_minted, usdt_registered");
+    Ok(())
+}

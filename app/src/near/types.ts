@@ -31,6 +31,9 @@ export interface MachineConfig {
   nft_fee_bps: number;
   platform_fee_bps: number;
   launched_at_block: number;
+  /** Phase 5 machines: where verifiable randomness comes from (absent on v1). */
+  vrf?: VrfConfig;
+  vrf_timeout_blocks?: number;
 }
 
 export interface Fees {
@@ -49,6 +52,13 @@ export interface Stats {
   total_payout: U128;
   best_multiplier_bps: number;
   best_pull_id: number | null;
+  /** Phase 5 machines only (absent on v1). */
+  refunds?: number;
+  total_usdt_refunded?: U128;
+  sells?: number;
+  total_tokens_sold?: U128;
+  total_sell_usdt_gross?: U128;
+  total_sell_usdt_paid?: U128;
 }
 
 export interface MachineView {
@@ -69,6 +79,40 @@ export interface MachineView {
   fees: Fees;
   stats: Stats;
   pull_nonce: number;
+  /** Phase 5 machines (VRF + sell-back). Absent on the v1 machine, which used block randomness. */
+  pending_usdt?: U128;
+  pending_count?: number;
+  request_nonce?: number;
+}
+
+export interface VrfConfig {
+  outlayer_contract: AccountId;
+  project_id: string;
+  /** OutLayer's VRF public key, 32 bytes hex. */
+  pubkey_hex: string;
+}
+
+/** A paid pack waiting for its VRF proof. */
+export interface PendingPull {
+  request_id: number;
+  buyer: AccountId;
+  count: number;
+  usdt: U128;
+  seed: string;
+  requested_at_block: number;
+  /** From this block anyone can call refund_expired. */
+  refundable_from_block: number;
+  refund_failed: boolean;
+}
+
+export interface SellQuote {
+  amount: U128;
+  usdt_gross: U128;
+  nft_fee: U128;
+  platform_fee: U128;
+  /** What the seller receives (USDT units). */
+  usdt_out: U128;
+  price_after: U128;
 }
 
 export interface PackQuote {
@@ -98,6 +142,10 @@ export interface PullRecord {
   certificate: boolean;
   seed: string;
   block: number;
+  /** Phase 5 machines: the VRF request this pull settled, and its proof. */
+  request_id?: number;
+  vrf_alpha?: string;
+  vrf_signature?: string;
 }
 
 export interface FtMetadata {

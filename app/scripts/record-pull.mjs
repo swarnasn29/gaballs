@@ -7,7 +7,7 @@ import { mkdirSync, renameSync } from 'node:fs';
 const kind = process.argv[2] ?? 'desktop';
 const base = process.argv[3] ?? 'http://127.0.0.1:3000';
 const out = process.argv[4] ?? 'recordings';
-const machine = process.env.MACHINE_ID ?? 'gball.gaballs.testnet';
+const machine = process.env.MACHINE_ID ?? 'gumball.gaballs.testnet';
 mkdirSync(out, { recursive: true });
 
 const phone = kind === 'phone';
@@ -56,12 +56,19 @@ await page.waitForTimeout(1800);
 await page.screenshot({ path: `${out}/${kind}-pending.png` });
 log('pending still saved');
 
-// The result comes from the contract; wait for it (or a failure message).
-const done = page.locator('text=/View transaction on nearblocks|did not go through|refund|cancelled/i').first();
-await done.waitFor({ timeout: 120000 });
+// Phase 5: after the wallet returns, the machine keeps wobbling while the VRF proof is on its way (~1 minute).
+await page.locator('text=/verifiable randomness proof from OutLayer|Still waiting for the randomness/').first().waitFor({ timeout: 120000 }).catch(() => {});
+await page.screenshot({ path: `${out}/${kind}-waiting-for-vrf.png` });
+log('waiting-for-VRF still saved');
+
+// The result comes from the contract; wait for it (or a failure/refund message). Up to the 5-minute VRF timeout.
+// (Not matching on 'randomness proof': the waiting message contains those words too.)
+const done = page.locator('text=/View transaction on nearblocks|did not go through|refunded|cancelled|Get my USDT back/i').first();
+await done.waitFor({ timeout: 360000 });
 log('result shown');
 await page.waitForTimeout(3000);
 const link = await page.locator('a', { hasText: 'View transaction on nearblocks' }).first().getAttribute('href').catch(() => null);
+const proof = await page.locator('a', { hasText: 'Verifiable randomness proof' }).first().getAttribute('href').catch(() => null);
 const tiers = await page.locator('[aria-live] strong').allInnerTexts().catch(() => []);
 const contextLost = await page.evaluate(() => document.querySelector('[data-context-lost]')?.dataset.contextLost ?? '0');
 clearInterval(sample);
@@ -74,5 +81,5 @@ renameSync(await video.path(), file);
 await browser.close();
 
 const avg = fps.length ? Math.round(fps.reduce((a, b) => a + b, 0) / fps.length) : 0;
-console.log(JSON.stringify({ kind, video: file, tx: link, tiers, contextLost, fps: { avg, min: Math.min(...fps), samples: fps.length } }));
+console.log(JSON.stringify({ kind, video: file, tx: link, proof, tiers, contextLost, fps: { avg, min: Math.min(...fps), samples: fps.length } }));
 if (consoleNotes.length) console.log('console:', [...new Set(consoleNotes)].slice(0, 8));

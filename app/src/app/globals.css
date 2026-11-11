@@ -46,10 +46,13 @@ h3,
   letter-spacing: 0.01em;
 }
 
-:focus-visible {
-  outline: 3px solid var(--color-grape);
-  outline-offset: 3px;
-  border-radius: 12px;
+/* In the base layer so component utilities (e.g. rounded-full on the capsule button) can override it. */
+@layer base {
+  :focus-visible {
+    outline: 3px solid var(--color-grape);
+    outline-offset: 3px;
+    border-radius: 12px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

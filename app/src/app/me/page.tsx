@@ -5,6 +5,7 @@ import { useState } from 'react';
 
 import { art } from '@/art/manifest';
 import { DeedCard } from '@/components/deed-card';
+import { SellPanel } from '@/components/sell-panel';
 import { Button, Card, Stat } from '@/components/ui';
 import { USDT_ID, accountUrl, txUrl } from '@/config';
 import { fmtNear, fmtTokens, fmtUsdt } from '@/lib/format';
@@ -28,7 +29,8 @@ function succeeded(o: ExecutionOutcome): boolean {
 }
 
 export default function MyStuff() {
-  const { account, faucet, claim, sweepFees } = useGaballsActions();
+  const { account, faucet, claim, sweepFees, sell } = useGaballsActions();
+  const [selling, setSelling] = useState<string | null>(null);
   const [msg, setMsg] = useState<{ text: string; tx?: string; bad?: boolean } | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -43,7 +45,14 @@ export default function MyStuff() {
         nft.tokensForOwner(account),
       ]);
       const coins = await Promise.all(
-        machines.map(async (m) => ({ info: m, balance: await machine(m.account_id).balanceOf(account) })),
+        machines.map(async (m) => {
+          const [balance, view] = await Promise.all([
+            machine(m.account_id).balanceOf(account),
+            machine(m.account_id).get().catch(() => null),
+          ]);
+          // Phase 5 machines (with VRF config) have sell-back; v1 machines do not.
+          return { info: m, balance, sellable: !!view?.config.vrf };
+        }),
       );
       const deeds = await Promise.all(
         tokens.filter(isMachineToken).map(async (t) => {
@@ -154,11 +163,40 @@ export default function MyStuff() {
           {d?.coins
             .filter((c) => c.balance !== '0')
             .map((c) => (
-              <li key={c.info.account_id} className="flex items-center justify-between py-2">
-                <Link className="font-bold text-grape underline" href={`/machine/${c.info.account_id}`}>
-                  ${c.info.symbol}
-                </Link>
-                <span className="tabular-nums">{fmtTokens(c.balance)}</span>
+              <li key={c.info.account_id} className="py-2">
+                <div className="flex items-center justify-between gap-3">
+                  <Link className="font-bold text-grape underline" href={`/machine/${c.info.account_id}`}>
+                    ${c.info.symbol}
+                  </Link>
+                  <span className="ml-auto tabular-nums">{fmtTokens(c.balance)}</span>
+                  {c.sellable ? (
+                    <Button
+                      variant="secondary"
+                      className="min-h-10 px-4 py-1 text-base"
+                      aria-expanded={selling === c.info.account_id}
+                      onClick={() => setSelling(selling === c.info.account_id ? null : c.info.account_id)}
+                    >
+                      {selling === c.info.account_id ? 'Close' : 'Sell'}
+                    </Button>
+                  ) : (
+                    <span className="rounded-full bg-blush px-2.5 py-0.5 text-xs font-bold text-plum ring-1 ring-lilac">
+                      v1 · no sell-back
+                    </span>
+                  )}
+                </div>
+                {selling === c.info.account_id && (
+                  <SellPanel
+                    machineId={c.info.account_id}
+                    symbol={c.info.symbol}
+                    balance={c.balance}
+                    busy={busy}
+                    onSell={async (amount, minOut) => {
+                      const ok = await run('Sell', () => sell(c.info.account_id, amount, minOut));
+                      if (ok) setSelling(null);
+                      return ok;
+                    }}
+                  />
+                )}
               </li>
             ))}
           {d && d.coins.every((c) => c.balance === '0') && <li className="py-2">No coins yet — open a pack.</li>}

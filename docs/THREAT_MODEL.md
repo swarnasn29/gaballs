@@ -44,6 +44,25 @@ them?** Secondary: how could anyone else steal or fake a fee balance?
 | T12 | **Spoofed certificate mint** by an unregistered contract. | R7: `mint_certificate` requires the predecessor to be a machine registered by the factory. | `mint_certificate_only_registered_machine` |
 | T13 | **Claim by a non-owner.** | R2: predecessor must equal the token owner. | `only_owner_can_claim` |
 
+## Phase 5: verifiable randomness and sell-back
+
+Who could try to bend a pull or a sale, and what stops them. Tests are in `contracts/machine/src/tests.rs` unless
+marked sandbox (`tests/sandbox/tests/flow.rs`, real contracts on a local node with a mock OutLayer).
+
+| # | Attack | What stops it | Test |
+| --- | --- | --- | --- |
+| V1 | **Forged proof.** Anyone (or a dishonest OutLayer worker) returns a made-up "random" result. | The callback runs `env::ed25519_verify` against the OutLayer VRF public key fixed at launch. Without OutLayer's key the signature cannot verify; the pull is refunded instead of settled. | `vrf_forged_proof_is_rejected_and_refunded`; sandbox `vrf_valid_forged_failed_and_timeout_on_chain` |
+| V2 | **Proof shopping.** A worker holds several genuine proofs and delivers the one with the best outcome for some request. | The alpha must end in *this* request's seed (`{machine}-{request_id}`, unique per machine and request) and name this buyer; a genuine proof for any other request is rejected. Each proof is deterministic (same key + alpha = same signature), so there is nothing to re-roll. | `vrf_proof_for_another_request_or_a_tampered_alpha_is_rejected` |
+| V3 | **Fake "value".** OutLayer's response includes a convenient `value` field. | Ignored. The rolls are computed by the contract from SHA-256 of the verified signature. | `vrf_valid_proof_settles_with_rolls_derived_from_the_signature` |
+| V4 | **Duplicate or late callback** pays twice. | Settle and refund both start by removing the pending entry; whichever runs first wins, the other finds nothing and does nothing. `on_vrf_result` is `#[private]`. | `vrf_duplicate_callback_is_ignored`, `vrf_timeout_refund_by_anyone_and_late_result_is_ignored` |
+| V5 | **USDT stuck** because OutLayer never answers. | OutLayer failure → callback refunds. No callback at all → after 300 blocks anyone can call `refund_expired`. A refund whose transfer fails goes back to pending, flagged, and can be retried at once. | `vrf_garbage_or_failed_result_is_refunded`, `failed_refund_goes_back_to_pending_and_can_be_retried_at_once`; sandbox step 4 (301-block fast-forward) |
+| V6 | **Seeing the roll first.** The buyer (or a validator) predicts the outcome and only pays when it is good. | The roll depends on OutLayer's signature over a request id assigned by OutLayer after the payment is final; it cannot be computed before. (Block randomness in v1 machines could be influenced by block producers.) | by construction |
+| V7 | **Machine runs out of NEAR** for VRF fees and payments strand. | `ft_on_transfer` refunds immediately when the free balance is below 0.1 NEAR + 0.01 NEAR; anyone can top the machine up with a plain NEAR transfer. | `payment_is_refunded_when_the_machine_cannot_pay_for_vrf` |
+| S1 | **Sell more USDT than the curve holds** (e.g. the creator dumps the 100M allocation at launch). | `quote_sell` rejects any sale whose `usdt_out` exceeds R. | `sell_that_would_push_the_reserve_below_zero_is_rejected` |
+| S2 | **Sandwich / price moves** between quote and sale. | `min_usdt_out`: the contract rejects the sale if it would pay less; the app sends quote − 1%. | `sell_slippage_guard`; sandbox `sell_back_on_chain` |
+| S3 | **USDT transfer fails** after the tokens were taken. | The callback returns the tokens and restores R and the fees (fees already swept away are not double-counted). | `failed_sell_transfer_restores_everything`, `failed_sell_after_a_sweep_restores_what_the_machine_still_holds` |
+| S4 | **Rounding drain** through many small sells. | Sell rounds in the contract's favour (the curve's remaining V+R is rounded up); the constant product never shrinks. | `curve_sell_matches_reference_and_rounds_for_the_contract` |
+
 ## Residual risks (not solved by the contract — disclosed in the README)
 
 - **Off-chain (OTC) sales.** If buyer and seller trade outside a marketplace ("send me USDT, I'll transfer"), the seller
@@ -54,3 +73,8 @@ them?** Secondary: how could anyone else steal or fake a fee balance?
 - **NFT and factory contract keys.** During the hackathon, `nft.gaballs.testnet` and `gaballs.testnet` keep a
   full-access key so they can be fixed and redeployed. Whoever holds those keys could, in principle, upgrade the NFT
   contract. Before submission we can delete those keys too (making them immutable) — decision for the human.
+- **Trusting OutLayer's key.** VRF proves the result came from OutLayer's key and was not chosen per request; it does
+  not prove OutLayer keeps that key private. The key is fixed per machine at launch: if OutLayer ever rotates it, that
+  machine's pulls stop verifying and every payment is refunded (no funds lost, but the machine stops opening packs).
+- **v1 machines** (`gball`, `lfg`, `lfgg`, launched before Phase 5) still use block randomness and have no sell-back.
+  They are keyless and cannot be upgraded; the app labels them "v1 · block randomness".

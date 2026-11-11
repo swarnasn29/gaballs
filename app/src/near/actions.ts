@@ -94,5 +94,30 @@ export function useGaballsActions() {
     [requireAccount, signAndSendTransactions],
   );
 
-  return { account, openPack, faucet, claim, sweepFees, transferMachineNft, launch };
+  /**
+   * Sells `amount` token units back to `machineId`'s curve. `minUsdtOut` is the slippage guard (the contract fails
+   * the sale if it would pay less). The seller must be registered on USDT to receive it: batched if needed.
+   */
+  const sell = useCallback(
+    async (machineId: string, amount: string, minUsdtOut: string) => {
+      const me = requireAccount();
+      const [registered, bounds] = await Promise.all([usdt.storageBalanceOf(me), usdt.storageBounds()]);
+      const txs: Tx[] = [];
+      if (!registered) txs.push(usdt.storageDepositTx(me, bounds.min));
+      txs.push(machine(machineId).sellTx(amount, minUsdtOut));
+      return lastOutcome(await signAndSendTransactions(txs));
+    },
+    [requireAccount, signAndSendTransactions],
+  );
+
+  /** Refunds a pending pull whose VRF proof never arrived (anyone may call once the timeout block has passed). */
+  const refundExpired = useCallback(
+    async (machineId: string, requestId: number) => {
+      requireAccount();
+      return lastOutcome(await signAndSendTransactions([machine(machineId).refundExpiredTx(requestId)]));
+    },
+    [requireAccount, signAndSendTransactions],
+  );
+
+  return { account, openPack, faucet, claim, sweepFees, transferMachineNft, launch, sell, refundExpired };
 }

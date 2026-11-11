@@ -41,7 +41,10 @@ pub const MAX_CREATOR_ALLOCATION: u128 = 100_000_000 * ONE_TOKEN;
 
 /// NEAR the machine keeps beyond its code storage: contract state, recent pulls, certificate mints.
 pub const MACHINE_RESERVE: NearToken = NearToken::from_near(1);
-pub const NFT_MINT_DEPOSIT: NearToken = NearToken::from_millinear(50);
+/// Attached to the Machine NFT mint. The NFT contract charges the exact storage and refunds the rest; the cost grows
+/// with the machine account's length (it is stored several times), and 0.05 NEAR was too little for
+/// `gumball.gaballs.testnet` (0.051 needed). 0.1 NEAR covers the longest allowed symbol with a wide margin.
+pub const NFT_MINT_DEPOSIT: NearToken = NearToken::from_millinear(100);
 pub const USDT_STORAGE_DEPOSIT: NearToken = NearToken::from_millinear(13);
 
 const GAS_FOR_MACHINE_INIT: Gas = Gas::from_tgas(30);

@@ -69,6 +69,21 @@ export function vaultHealth(m: MachineView) {
   return { pct, label: pct >= 80 ? 'Healthy' : pct >= 40 ? 'OK' : 'Low' };
 }
 
+/**
+ * Machines launched before Phase 5 roll on block randomness (env::random_seed) and have no sell-back. They can never be
+ * upgraded (keyless), so the app labels them instead.
+ */
+export function RandomnessBadge({ view }: { view: MachineView | null }) {
+  if (!view) return null;
+  return view.config.vrf ? (
+    <span className="w-fit rounded-full bg-good/15 px-2.5 py-0.5 text-xs font-bold text-good">Verifiable randomness (VRF)</span>
+  ) : (
+    <span className="w-fit rounded-full bg-blush px-2.5 py-0.5 text-xs font-bold text-plum ring-1 ring-lilac">
+      v1 · block randomness · no sell-back
+    </span>
+  );
+}
+
 /** Home-screen card: market cap, packs opened, best multiplier, price. */
 export function MachineCard({ info, view }: { info: MachineInfo; view: MachineView | null }) {
   const id = info.account_id;
@@ -84,6 +99,7 @@ export function MachineCard({ info, view }: { info: MachineInfo; view: MachineVi
           </p>
         </div>
       </Link>
+      <RandomnessBadge view={view} />
       {view ? (
         <dl className="grid grid-cols-2 gap-2">
           <Stat label="Market cap" value={fmtUsdtCompact(view.market_cap_usdt)} source={{ contract: id, method: 'get_machine' }} />

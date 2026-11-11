@@ -53,3 +53,16 @@ export async function nearBalance(accountId: string): Promise<bigint> {
   if (body.error) throw new ViewError(`view_account ${accountId}: ${JSON.stringify(body.error.cause ?? body.error)}`);
   return BigInt(body.result.amount);
 }
+
+/** Latest final block height. */
+export async function blockHeight(): Promise<number> {
+  const res = await fetch(RPC_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ jsonrpc: '2.0', id: 'gaballs', method: 'block', params: { finality: 'final' } }),
+    cache: 'no-store',
+  });
+  const body = await res.json();
+  if (body.error) throw new ViewError(`block: ${JSON.stringify(body.error.cause ?? body.error)}`);
+  return body.result.header.height as number;
+}

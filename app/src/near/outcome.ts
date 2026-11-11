@@ -33,6 +33,8 @@ export function events(outcome: ExecutionOutcome): NepEvent[] {
 
 export type PackResult =
   | { kind: 'opened'; txHash: string; pulls: PullRecord[] }
+  /** Phase 5 machines: payment accepted, the VRF proof arrives in a later receipt (about a minute). */
+  | { kind: 'requested'; txHash: string; requestId: number }
   | { kind: 'refunded'; txHash: string; reason: string }
   | { kind: 'failed'; txHash?: string; reason: string };
 
@@ -43,19 +45,36 @@ function failureMessage(status: unknown): string | null {
   return null;
 }
 
-/** Interprets the ft_transfer_call outcome of an "open pack" transaction. */
+function ours(outcome: ExecutionOutcome, name: string) {
+  return events(outcome).filter((e) => e.standard === 'gaballs' && e.event === name);
+}
+
+/**
+ * Interprets the ft_transfer_call outcome of an "open pack" transaction. Wallets that wait for every receipt return
+ * the settled pulls directly; otherwise a Phase 5 machine shows only `pack_requested` and the caller waits for
+ * settlement on-chain (src/lib/use-pull.ts).
+ */
 export function readPackOutcome(outcome: ExecutionOutcome, buyer: string): PackResult {
   const txHash = outcome.transaction.hash;
-  const pulls = events(outcome)
-    .filter((e) => e.standard === 'gaballs' && e.event === 'pack_opened')
+  const pulls = ours(outcome, 'pack_opened')
     .flatMap((e) => e.data as PullRecord[])
     .filter((p) => p.buyer === buyer);
   if (pulls.length > 0) return { kind: 'opened', txHash, pulls };
 
+  const vrfRefund = ours(outcome, 'pack_refunded')
+    .flatMap((e) => e.data as { buyer: string; reason: string }[])
+    .find((r) => r.buyer === buyer);
+  if (vrfRefund) return { kind: 'refunded', txHash, reason: vrfRefund.reason };
+
   const refundLog = outcome.receipts_outcome
     .flatMap((r) => r.outcome.logs)
-    .find((l) => l.startsWith('refund '));
+    .find((l) => /^refund \d+: /.test(l));
   if (refundLog) return { kind: 'refunded', txHash, reason: refundLog.replace(/^refund \d+: /, '') };
+
+  const requested = ours(outcome, 'pack_requested')
+    .flatMap((e) => e.data as { request_id: number; buyer: string }[])
+    .find((r) => r.buyer === buyer);
+  if (requested) return { kind: 'requested', txHash, requestId: requested.request_id };
 
   const failed = failureMessage(outcome.status) ?? outcome.receipts_outcome.map((r) => failureMessage(r.outcome.status)).find(Boolean);
   return { kind: 'failed', txHash, reason: failed ?? 'No pack_opened event in the transaction' };

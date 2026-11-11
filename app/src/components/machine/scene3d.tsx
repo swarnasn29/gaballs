@@ -33,6 +33,8 @@ export interface Scene3DProps {
   onCrank: () => void;
   onCapsulesOut: () => void;
   view?: CameraView;
+  /** Called about once per second with the scene's measured frame rate (for the smart 2D/3D switch). */
+  onFps?: (fps: number) => void;
 }
 
 // ---------------------------------------------------------------------------------------------- dimensions
@@ -794,17 +796,24 @@ function FirstFrame({ onFirstFrame }: { onFirstFrame: () => void }) {
   return null;
 }
 
-/** Frames per second, published on the canvas wrapper (data-fps) for the self-check. */
-function FpsProbe() {
+/**
+ * Frames per second, published on the canvas wrapper (data-fps) for the self-check and passed to `onFps`.
+ * Not reported while the tab is hidden, or for a window over 5 s (frames were paused, e.g. the tab was in the
+ * background). Slow frames still count: a phone drawing 2 fps produces ~1-2 s windows, and that is real slowness.
+ */
+function FpsProbe({ onFps }: { onFps?: (fps: number) => void }) {
   const { gl } = useThree();
   const frames = useRef(0);
   const since = useRef(0);
   useFrame((state) => {
     frames.current++;
     const t = state.clock.elapsedTime;
-    if (t - since.current >= 1) {
+    const span = t - since.current;
+    if (span >= 1) {
+      const fps = frames.current / span;
       const el = gl.domElement.parentElement;
-      if (el) el.dataset.fps = String(Math.round(frames.current / (t - since.current)));
+      if (el) el.dataset.fps = String(Math.round(fps));
+      if (span <= 5 && !document.hidden) onFps?.(fps);
       frames.current = 0;
       since.current = t;
     }
@@ -950,7 +959,7 @@ function SceneCanvas({
         color="#563791"
         frames={1}
       />
-      <FpsProbe />
+      <FpsProbe onFps={props.onFps} />
       <FirstFrame onFirstFrame={onFirstFrame} />
     </Canvas>
   );

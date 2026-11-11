@@ -13,7 +13,9 @@ import type {
   NftToken,
   OddsView,
   PackQuote,
+  PendingPull,
   PullRecord,
+  SellQuote,
   StorageBalance,
   StorageBalanceBounds,
   U128,
@@ -76,7 +78,16 @@ export function machine(id: AccountId) {
     storageBalanceOf: (accountId: AccountId) =>
       view<StorageBalance | null>(id, 'storage_balance_of', { account_id: accountId }),
     storageBounds: () => view<StorageBalanceBounds>(id, 'storage_balance_bounds'),
+    /** Phase 5 machines only. */
+    pendingPull: (requestId: number) => view<PendingPull | null>(id, 'get_pending_pull', { request_id: requestId }),
+    pending: (accountId?: AccountId) => view<PendingPull[]>(id, 'get_pending', { account_id: accountId ?? null }),
+    quoteSell: (amount: U128) => view<SellQuote>(id, 'quote_sell', { amount }),
 
+    /** Sell tokens back to the curve; fails on-chain if the payout would be below `minUsdtOut`. */
+    sellTx: (amount: U128, minUsdtOut: U128) =>
+      fnCall(id, 'sell', { amount, min_usdt_out: minUsdtOut }, ONE_YOCTO, 100n),
+    /** Anyone can refund a pending pull once its timeout block has passed. */
+    refundExpiredTx: (requestId: number) => fnCall(id, 'refund_expired', { request_id: requestId }, '0', 100n),
     storageDepositTx: (accountId: AccountId, deposit: U128) =>
       fnCall(id, 'storage_deposit', { account_id: accountId, registration_only: true }, deposit, 30n),
     sweepFeesTx: () => fnCall(id, 'sweep_fees', {}, '0', 150n),

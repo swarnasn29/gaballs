@@ -10,6 +10,7 @@ import { art, tierColor } from '@/art/manifest';
 import { txUrl } from '@/config';
 import { fmtMultiplier, fmtTokens, tokenNumber, tokensToUsdt } from '@/lib/format';
 import { setMuted, sfx, unlockAudio, useSound } from '@/lib/sfx';
+import { cx } from '@/components/ui';
 import type { PullRecord, TierName } from '@/near/types';
 import { Confetti, Puff, Rays, Sparkles } from './effects';
 
@@ -46,6 +47,38 @@ function usd(n: number) {
 }
 
 type Stage = 'closed' | 'cracking' | 'revealed' | 'summary';
+
+/** Link to /proof for a VRF-settled pull (`index` = its position within its request). Null on v1 pulls. */
+function proofHref(machineId: string, pull: PullRecord, index: number): string | null {
+  if (!pull.vrf_alpha || !pull.vrf_signature) return null;
+  const q = new URLSearchParams({
+    machine: machineId,
+    alpha: pull.vrf_alpha,
+    sig: pull.vrf_signature,
+    i: String(index),
+    roll: String(pull.roll),
+    tier: pull.tier,
+    pull: String(pull.pull_id),
+  });
+  return `/proof?${q}`;
+}
+
+function ResultLinks({ txHash, proof, center }: { txHash: string; proof: string | null; center?: boolean }) {
+  return (
+    <p className={cx('mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm font-semibold', center && 'justify-center')}>
+      {proof && (
+        <a className="text-grape underline" href={proof} target="_blank" rel="noreferrer">
+          Verifiable randomness proof
+        </a>
+      )}
+      {txHash && (
+        <a className="text-grape underline" href={txUrl(txHash)} target="_blank" rel="noreferrer">
+          View transaction on nearblocks
+        </a>
+      )}
+    </p>
+  );
+}
 
 export function RevealDialog({
   pulls,
@@ -271,9 +304,7 @@ export function RevealDialog({
                   </div>
                 </div>
               )}
-              <a className="mt-1 text-sm font-semibold text-grape underline" href={txUrl(txHash)} target="_blank" rel="noreferrer">
-                View transaction on nearblocks
-              </a>
+              <ResultLinks txHash={txHash} proof={proofHref(machineId, pull, i)} />
             </div>
           )}
           {stage === 'summary' && (
@@ -297,9 +328,7 @@ export function RevealDialog({
                 Total: {fmtTokens(pulls.reduce((a, p) => a + BigInt(p.payout), 0n))} ${symbol} (
                 {usd(pulls.reduce((a, p) => a + tokensToUsdt(p.payout, p.price_after), 0))})
               </p>
-              <a className="mt-1 block text-center text-sm font-semibold text-grape underline" href={txUrl(txHash)} target="_blank" rel="noreferrer">
-                View transaction on nearblocks
-              </a>
+              <ResultLinks txHash={txHash} proof={proofHref(machineId, pulls[0], 0)} center />
             </div>
           )}
 

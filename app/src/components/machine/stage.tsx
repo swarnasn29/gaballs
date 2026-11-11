@@ -1,10 +1,16 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { Component, type ReactNode } from 'react';
+import { Component, useCallback, useEffect, useRef, type ReactNode } from 'react';
 
 import { art } from '@/art/manifest';
-import { setMachineMode, useMachineMode } from '@/lib/use-machine-mode';
+import {
+  dismissNotice,
+  reportProbePassed,
+  reportTooSlow,
+  setMachineMode,
+  useMachineMode,
+} from '@/lib/use-machine-mode';
 import { Machine2D } from './machine-2d';
 import { ballCount, type StagePhase } from './shared';
 
@@ -48,11 +54,51 @@ const LABEL: Record<StagePhase, string> = {
   resting: 'Your capsule is in the tray.',
 };
 
+/** Below this on the 1-second probe, the device gets the 2D machine. */
+const PROBE_MIN_FPS = 30;
+/** Three consecutive seconds below this while playing switch to 2D. */
+const GUARD_MIN_FPS = 24;
+const GUARD_SECONDS = 3;
+
+/**
+ * Smart 2D/3D: while the 3D scene runs on automatic, the first measured second is a warm-up (shaders, physics), the
+ * next is the probe, and after that a guard watches for a sustained drop. Off when the user picked a mode.
+ */
+function useFpsGuard(active: boolean, probed: boolean) {
+  const samples = useRef<number[]>([]);
+  const state = useRef({ active, probed });
+  useEffect(() => {
+    state.current = { active, probed };
+  }, [active, probed]);
+  return useCallback((fps: number) => {
+    const { active, probed } = state.current;
+    if (!active) {
+      samples.current = [];
+      return;
+    }
+    samples.current.push(fps);
+    if (!probed) {
+      if (samples.current.length < 2) return; // warm-up second
+      samples.current = [];
+      if (fps < PROBE_MIN_FPS) reportTooSlow(fps, 'probe');
+      else reportProbePassed();
+      return;
+    }
+    const recent = samples.current.slice(-GUARD_SECONDS);
+    samples.current = recent;
+    if (recent.length === GUARD_SECONDS && recent.every((f) => f < GUARD_MIN_FPS)) {
+      samples.current = [];
+      reportTooSlow(recent.reduce((a, f) => a + f, 0) / recent.length, 'play');
+    }
+  }, []);
+}
+
 export function MachineStage(props: StageProps) {
   const m = useMachineMode();
   const quality = m?.quality ?? 'high';
   const show3d = m?.mode === '3d';
   const vaultPct = props.vaultPct;
+  const onFps = useFpsGuard(show3d && !m?.overridden, !!m?.probed);
   // While get_machine() loads, the 2D machine shows an empty dome: same element as after loading, so the machine
   // image paints once (good LCP) instead of being swapped for a new one when the data arrives.
   const flat = (
@@ -74,12 +120,20 @@ export function MachineStage(props: StageProps) {
       >
         {show3d && vaultPct !== undefined ? (
           <FallbackTo2D fallback={flat}>
-            <Scene3D {...props} vaultPct={vaultPct} quality={quality} />
+            <Scene3D {...props} vaultPct={vaultPct} quality={quality} onFps={onFps} />
           </FallbackTo2D>
         ) : (
           flat
         )}
       </div>
+      {m?.notice && (
+        <p role="status" className="flex max-w-md items-center gap-2 rounded-2xl bg-white px-3 py-1.5 text-xs font-semibold text-plum shadow-chunky">
+          {m.notice}
+          <button type="button" className="shrink-0 underline" onClick={dismissNotice}>
+            OK
+          </button>
+        </p>
+      )}
       {/* the mode is only known in the browser: keep the pill's height reserved so nothing shifts when it appears */}
       {!m && <div className="h-7" aria-hidden />}
       {m && (

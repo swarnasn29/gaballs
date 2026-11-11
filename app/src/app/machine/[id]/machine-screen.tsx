@@ -7,7 +7,7 @@ import { MachineStage } from '@/components/machine/stage';
 import { PullFeed } from '@/components/pull-feed';
 import { RevealDialog } from '@/components/reveal/reveal-dialog';
 import type { StagePhase } from '@/components/machine/shared';
-import { OddsTable, RiskNotice, vaultHealth } from '@/components/machine-bits';
+import { OddsTable, RandomnessBadge, RiskNotice, vaultHealth } from '@/components/machine-bits';
 import { Card, Stat } from '@/components/ui';
 import { fmtMultiplier, fmtPrice, fmtTokens, fmtUsdtCompact } from '@/lib/format';
 import { usePull } from '@/lib/use-pull';
@@ -61,6 +61,8 @@ export function MachineScreen({ id }: { id: string }) {
           <p className="font-semibold text-plum">
             ${meta.data?.symbol ?? '…'} · {id}
           </p>
+          {/* same height while loading, so nothing shifts when get_machine() answers */}
+          <div className="mt-1 h-6">{v && <RandomnessBadge view={v} />}</div>
         </div>
         {/* rendered while loading too (values "…"), so the page doesn't jump when get_machine() answers */}
         <dl className="grid w-full grid-cols-2 gap-2 sm:w-auto sm:grid-cols-4">
@@ -124,6 +126,7 @@ export function MachineScreen({ id }: { id: string }) {
             capsuleOut={capsuleOut}
             onOpen={open}
             onReset={reset}
+            onRefund={() => void pull.refund()}
           />
           {odds.data && <OddsTable odds={odds.data} machineId={id} />}
           <RiskNotice />

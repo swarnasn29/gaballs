@@ -18,6 +18,7 @@ export function BuyPanel({
   capsuleOut,
   onOpen,
   onReset,
+  onRefund,
 }: {
   account: string;
   count: number;
@@ -26,9 +27,12 @@ export function BuyPanel({
   capsuleOut: boolean;
   onOpen: () => void;
   onReset: () => void;
+  /** Timed-out VRF request: send refund_expired. */
+  onRefund: () => void;
 }) {
   const pending = state.phase === 'pending';
-  const finished = state.phase !== 'idle' && !pending;
+  const timedOut = state.phase === 'timedOut';
+  const finished = state.phase !== 'idle' && !pending && !timedOut;
 
   return (
     <div className="flex flex-col gap-3">
@@ -52,7 +56,11 @@ export function BuyPanel({
         <span className="ml-1 whitespace-nowrap font-bold">= {count * 10} USDT</span>
       </fieldset>
 
-      {finished ? (
+      {timedOut ? (
+        <Button onClick={onRefund} disabled={state.refunding}>
+          {state.refunding ? 'Refunding…' : 'Get my USDT back'}
+        </Button>
+      ) : finished ? (
         <Button variant="secondary" onClick={onReset}>
           Play again
         </Button>
@@ -66,9 +74,25 @@ export function BuyPanel({
       <div aria-live="polite" className="min-h-6 text-sm">
         {pending && (
           <p>
-            {state.slow
-              ? 'Still waiting for the wallet or the network… The machine keeps going until the contract answers.'
-              : 'Waiting for the transaction. The result comes from the contract, not from the animation.'}
+            {state.vrf
+              ? state.slow
+                ? 'Still waiting for the randomness proof. If none arrives within about 5 minutes, you can take your USDT back.'
+                : 'Waiting for your payment and a verifiable randomness proof from OutLayer (usually about a minute). The contract checks the proof before opening your capsule.'
+              : state.slow
+                ? 'Still waiting for the wallet or the network… The machine keeps going until the contract answers.'
+                : 'Waiting for the transaction. The result comes from the contract, not from the animation.'}
+          </p>
+        )}
+        {timedOut && (
+          <p className="font-semibold text-warn">
+            The randomness proof did not arrive in time, so nothing was bought. Your USDT is safe in the machine: take it
+            back with the button above.{' '}
+            {state.txHash && (
+              <a className="underline" href={txUrl(state.txHash)} target="_blank" rel="noreferrer">
+                View transaction
+              </a>
+            )}
+            {state.error && <span className="block text-bad">{state.error}</span>}
           </p>
         )}
         {state.phase === 'failed' && (
@@ -84,9 +108,11 @@ export function BuyPanel({
         {state.phase === 'refunded' && (
           <p className="font-semibold text-warn">
             {state.message}{' '}
-            <a className="underline" href={txUrl(state.txHash)} target="_blank" rel="noreferrer">
-              View transaction
-            </a>
+            {state.txHash && (
+              <a className="underline" href={txUrl(state.txHash)} target="_blank" rel="noreferrer">
+                View transaction
+              </a>
+            )}
           </p>
         )}
         {state.phase === 'opened' && !capsuleOut && <p>The contract answered. Here comes your capsule…</p>}
@@ -99,9 +125,11 @@ export function BuyPanel({
                 {p.capped && <span className="text-warn">(capped by vault)</span>}
               </p>
             ))}
-            <a className="font-semibold text-grape underline" href={txUrl(state.txHash)} target="_blank" rel="noreferrer">
-              View transaction on nearblocks
-            </a>
+            {state.txHash && (
+              <a className="font-semibold text-grape underline" href={txUrl(state.txHash)} target="_blank" rel="noreferrer">
+                View transaction on nearblocks
+              </a>
+            )}
           </div>
         )}
       </div>

@@ -9,10 +9,14 @@ async function Machines() {
   const machines = await factory.getMachines().catch(() => []);
   const views = await Promise.all(machines.map((m) => machine(m.account_id).get().catch(() => null)));
   if (machines.length === 0) return <Card>No machines yet — launch the first one.</Card>;
+  // Verifiable-randomness machines first, newest first; v1 machines (block randomness) after them.
+  const rows = machines
+    .map((info, i) => ({ info, view: views[i], order: i }))
+    .sort((a, b) => Number(!!b.view?.config.vrf) - Number(!!a.view?.config.vrf) || b.order - a.order);
   return (
     <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-      {machines.map((m, i) => (
-        <MachineCard key={m.account_id} info={m} view={views[i]} />
+      {rows.map(({ info, view }) => (
+        <MachineCard key={info.account_id} info={info} view={view} />
       ))}
     </div>
   );
