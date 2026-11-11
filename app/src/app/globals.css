@@ -75,3 +75,18 @@ h3,
 .gumball-hop {
   animation: gumball-hop var(--dur) ease-in-out var(--delay) infinite;
 }
+
+/* Background clouds and bubbles: gentle side-to-side drift (duration set per item inline) */
+@keyframes sky-drift {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(24px, -6px);
+  }
+}
+.sky-drift {
+  animation: sky-drift 30s ease-in-out infinite;
+  will-change: transform;
+}

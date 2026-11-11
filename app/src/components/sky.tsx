@@ -28,13 +28,14 @@ function Layer({ item, px, py, still }: { item: Item; px: MotionValue<number>; p
   const y = useTransform(py, (v) => v * item.depth * 0.6);
   return (
     <motion.div style={{ ...deco(item.style), x, y }}>
-      <motion.img
+      {/* the slow drift is a CSS animation (runs on the compositor, no per-frame JavaScript); see .sky-drift */}
+      {/* eslint-disable-next-line @next/next/no-img-element -- decorative art from the manifest */}
+      <img
         src={item.src}
         alt=""
         draggable={false}
-        style={{ width: '100%', display: 'block' }}
-        animate={still || !item.drift ? undefined : { x: [0, 24, 0], y: [0, -6, 0] }}
-        transition={item.drift ? { duration: item.drift, repeat: Infinity, ease: 'easeInOut' } : undefined}
+        className={still || !item.drift ? undefined : 'sky-drift'}
+        style={{ width: '100%', display: 'block', animationDuration: item.drift ? `${item.drift}s` : undefined }}
       />
     </motion.div>
   );
