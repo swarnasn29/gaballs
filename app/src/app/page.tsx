@@ -1,33 +1,42 @@
 import { Suspense } from 'react';
 
-import { MachineCard } from '@/components/machine-bits';
+import { MachineCard, generationOf } from '@/components/machine-bits';
 import { Card } from '@/components/ui';
 import { FEATURED_MACHINE } from '@/config';
 import { factory, machine } from '@/near/contracts';
+import { codeSha256 } from '@/near/rpc';
 
 /** Live machine list: read from the chain on every request (streams in after the static shell). */
 async function Machines() {
   const machines = await factory.getMachines().catch(() => []);
-  const views = await Promise.all(machines.map((m) => machine(m.account_id).get().catch(() => null)));
+  const [views, codes, config] = await Promise.all([
+    Promise.all(machines.map((m) => machine(m.account_id).get().catch(() => null))),
+    Promise.all(machines.map((m) => codeSha256(m.account_id).catch(() => null))),
+    factory.getConfig().catch(() => null),
+  ]);
   if (machines.length === 0) return <Card>No machines yet — launch the first one.</Card>;
-  // Verifiable-randomness machines, newest first. Machines launched before Phase 5 (block randomness, no sell-back) can
-  // never be upgraded: they stay playable but are tucked into a collapsed "Legacy" section.
-  // The featured machine (the demo machine, GUMBALL) leads; the rest follow newest first.
+  // Machines running the factory's current code (VRF, sell-back, squads): the featured one first, then newest first.
+  // Older machines are keyless and can never be upgraded: they stay playable in a collapsed "Legacy" section.
   const rows = machines
-    .map((info, i) => ({ info, view: views[i], order: i }))
+    .map((info, i) => ({
+      info,
+      view: views[i],
+      order: i,
+      generation: generationOf(views[i], codes[i], config?.machine_code_sha256 ?? null),
+    }))
     .sort((a, b) => Number(b.info.account_id === FEATURED_MACHINE) - Number(a.info.account_id === FEATURED_MACHINE) || b.order - a.order);
-  const current = rows.filter((r) => r.view?.config.vrf);
-  const legacy = rows.filter((r) => !r.view?.config.vrf);
+  const current = rows.filter((r) => r.generation === 'current');
+  const legacy = rows.filter((r) => r.generation !== 'current');
   return (
     <div className="flex flex-col gap-5">
       {current.length > 0 ? (
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {current.map(({ info, view }) => (
-            <MachineCard key={info.account_id} info={info} view={view} />
+          {current.map(({ info, view, generation }) => (
+            <MachineCard key={info.account_id} info={info} view={view} generation={generation} />
           ))}
         </div>
       ) : (
-        <Card>No machines with verifiable randomness yet — launch the first one.</Card>
+        <Card>No machines on the current version yet — launch the first one.</Card>
       )}
       {legacy.length > 0 && (
         <details className="group flex flex-col gap-4">
@@ -35,15 +44,15 @@ async function Machines() {
             <span className="inline-block transition-transform group-open:rotate-90" aria-hidden>
               ▸
             </span>
-            Legacy (v1, block randomness) · {legacy.length} machine{legacy.length > 1 ? 's' : ''}
+            Legacy machines · {legacy.length}
           </summary>
           <p className="mt-3 max-w-2xl rounded-2xl bg-white/80 px-4 py-2 text-sm text-plum">
-            Launched before verifiable randomness and sell-back. Their contracts have no keys, so they can never be upgraded:
-            pulls there use block randomness, and their coins cannot be sold back.
+            Launched with earlier machine code. Machines have no keys, so they can never be upgraded: v1 machines use block
+            randomness and have no sell-back; the first VRF version cannot be played by squads.
           </p>
           <div className="mt-4 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {legacy.map(({ info, view }) => (
-              <MachineCard key={info.account_id} info={info} view={view} />
+            {legacy.map(({ info, view, generation }) => (
+              <MachineCard key={info.account_id} info={info} view={view} generation={generation} />
             ))}
           </div>
         </details>

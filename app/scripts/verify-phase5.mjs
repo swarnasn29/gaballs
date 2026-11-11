@@ -6,8 +6,8 @@ import { mkdirSync } from 'node:fs';
 
 const out = process.argv[2] ?? 'verify-phase5';
 const B = 'http://127.0.0.1:3000';
-const machineId = process.env.MACHINE_ID ?? 'gumball.gaballs.testnet';
-const symbol = process.env.SYMBOL ?? 'GUMBALL';
+const machineId = process.env.MACHINE_ID ?? 'gaballs.gaballs.testnet';
+const symbol = process.env.SYMBOL ?? 'GABALLS';
 mkdirSync(out, { recursive: true });
 const log = (m) => console.log(m);
 const errs = [];

@@ -111,6 +111,8 @@ export const usdt = {
   storageDepositTx: (accountId: AccountId, deposit: U128) =>
     fnCall(USDT_ID, 'storage_deposit', { account_id: accountId, registration_only: true }, deposit, 30n),
   faucetTx: () => fnCall(USDT_ID, 'faucet', {}, '0', 30n),
+  transferTx: (receiverId: AccountId, amount: U128) =>
+    fnCall(USDT_ID, 'ft_transfer', { receiver_id: receiverId, amount, memo: 'squad chip-in' }, ONE_YOCTO, 30n),
   /** Pays for `count` packs: USDT ft_transfer_call → machine.ft_on_transfer. */
   openPackTx: (machineId: AccountId, count: number, packPrice: U128) =>
     fnCall(

@@ -5,7 +5,9 @@
 
 import { useCallback } from 'react';
 import { useNearWallet } from '@/providers/near-provider';
+import { FEATURED_MACHINE } from '@/config';
 import { factory, machine, nft, usdt, type Tx } from './contracts';
+import { createSquadTx, squadIdFor, voteTx } from './sputnik';
 import { readPackOutcome, type ExecutionOutcome, type PackResult } from './outcome';
 
 export class UserFacingError extends Error {}
@@ -119,5 +121,70 @@ export function useGaballsActions() {
     [requireAccount, signAndSendTransactions],
   );
 
-  return { account, openPack, faucet, claim, sweepFees, transferMachineNft, launch, sell, refundExpired };
+  // ---------------------------------------------------------------------------------------------- squads (Sputnik DAO)
+
+  /**
+   * Creates a squad DAO on the Sputnik factory (6 NEAR) and, in the same approval, pays its storage on mock USDT and on
+   * the flagship machine's token so it can receive USDT and prizes right away.
+   */
+  const createSquad = useCallback(
+    async (name: string, members: string[], threshold: number, title: string) => {
+      requireAccount();
+      const dao = squadIdFor(name);
+      const [usdtBounds, tokenBounds] = await Promise.all([usdt.storageBounds(), machine(FEATURED_MACHINE).storageBounds()]);
+      const outcomes = await signAndSendTransactions([
+        createSquadTx(name, members, threshold, title),
+        usdt.storageDepositTx(dao, usdtBounds.min),
+        machine(FEATURED_MACHINE).storageDepositTx(dao, tokenBounds.min),
+      ]);
+      return { dao, outcome: lastOutcome(outcomes), first: outcomes[0] };
+    },
+    [requireAccount, signAndSendTransactions],
+  );
+
+  /** Sends one proposal transaction (built in src/near/sputnik.ts; carries the 0.1 NEAR bond). */
+  const propose = useCallback(
+    async (tx: Tx) => {
+      requireAccount();
+      return lastOutcome(await signAndSendTransactions([tx]));
+    },
+    [requireAccount, signAndSendTransactions],
+  );
+
+  const vote = useCallback(
+    async (dao: string, id: number, approve: boolean) => {
+      requireAccount();
+      return lastOutcome(await signAndSendTransactions([voteTx(dao, id, approve)]));
+    },
+    [requireAccount, signAndSendTransactions],
+  );
+
+  /** Sends mock USDT to the squad's treasury (registers the squad on USDT first if needed). */
+  const chipIn = useCallback(
+    async (dao: string, amount: string) => {
+      requireAccount();
+      const [registered, bounds] = await Promise.all([usdt.storageBalanceOf(dao), usdt.storageBounds()]);
+      const txs: Tx[] = [];
+      if (!registered) txs.push(usdt.storageDepositTx(dao, bounds.min));
+      txs.push(usdt.transferTx(dao, amount));
+      return lastOutcome(await signAndSendTransactions(txs));
+    },
+    [requireAccount, signAndSendTransactions],
+  );
+
+  return {
+    account,
+    openPack,
+    faucet,
+    claim,
+    sweepFees,
+    transferMachineNft,
+    launch,
+    sell,
+    refundExpired,
+    createSquad,
+    propose,
+    vote,
+    chipIn,
+  };
 }

@@ -13,6 +13,7 @@ import { cx } from './ui';
 const links = [
   { href: '/', label: 'Machines' },
   { href: '/launch', label: 'Launch' },
+  { href: '/squads', label: 'Squads' },
   { href: '/me', label: 'My stuff' },
 ];
 
@@ -35,7 +36,7 @@ function NavList({ pathname }: { pathname: string | null }) {
             href={l.href}
             aria-current={active ? 'page' : undefined}
             className={cx(
-              'flex-1 rounded-full px-4 py-2 text-center font-display text-base font-semibold sm:flex-none',
+              'flex-1 whitespace-nowrap rounded-full px-2 py-2 text-center font-display text-sm font-semibold sm:flex-none sm:px-4 sm:text-base',
               active ? 'bg-grape text-white' : 'text-grape hover:bg-blush',
             )}
           >

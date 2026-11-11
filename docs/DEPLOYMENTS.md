@@ -1,6 +1,132 @@
 # Deployments (testnet)
 
-## Current: Phase 5 (verifiable randomness + sell-back), 2026-11-11 UTC
+## Current: flagship GABALLS + Squads, 2026-11-11/12 UTC
+
+**`gaballs.gaballs.testnet` ($GABALLS) is the single flagship** for individuals and squads. It runs the last machine
+code: verifiable randomness, sell-back, and a VRF check that accepts a proof signed by any account as long as it carries
+this pull's unique seed (needed for Sputnik DAO squads; see docs/THREAT_MODEL.md). Machines launched with earlier code
+stay playable under "Legacy machines" in the app: `gumball`, `bubbles` (first VRF version) and `gball`, `lfg`, `lfgg` (v1).
+
+| Account | Contract | Code SHA-256 (hex) | Access keys |
+| --- | --- | --- | --- |
+| [`gaballs.testnet`](https://testnet.nearblocks.io/address/gaballs.testnet) | Factory (unchanged since the NFT-deposit fix) | `291af832af06fe62057bc7ed2578daeadc17c2591441464c1afadd81f0c70539` | 1 full-access (locked in Phase 7) |
+| machine code stored in `gaballs.testnet` | Machine (final) | `a43447c8f8323d0643fc70e0cb6108b5be63b14083f805e40ea7e6d81a025935` | — |
+| [`gaballs.gaballs.testnet`](https://testnet.nearblocks.io/address/gaballs.gaballs.testnet) | Machine + token GABALLS (flagship) | `a43447c8f8323d0643fc70e0cb6108b5be63b14083f805e40ea7e6d81a025935` (= factory `machine_code_sha256`) | **0 — no keys** |
+| [`nft.gaballs.testnet`](https://testnet.nearblocks.io/address/nft.gaballs.testnet), [`usdt.gaballs.testnet`](https://testnet.nearblocks.io/address/usdt.gaballs.testnet) | NFT, mock USDT (unchanged) | `afb4e0ee…2e75`, `6343ee95…8f47` | 1 full-access each (locked in Phase 7) |
+| [`gaballs-squad.sputnikv2.testnet`](https://testnet.nearblocks.io/address/gaballs-squad.sputnikv2.testnet) | Squad: Sputnik DAO v2 (factory `sputnikv2.testnet`, default code v3.31) | `880bae9a58c99ec1efe8b10cf834b3f0c0ebc7a05d71206f3c1202c4280952da` (base58 `AA4nA45v…dgcH`, the factory's default) | 0 |
+
+### New machine code
+
+| Step | Transaction |
+| --- | --- |
+| factory.set_machine_code(machine with signer-agnostic VRF check) | [AnaVSGA6…](https://testnet.nearblocks.io/txns/AnaVSGA6W1tBg1m9eMxdxV9SutbgUxKtfBGYAkszpRG3) |
+
+### Launch and demo run: GABALLS (30 VRF packs + a sell)
+
+`SYMBOL=GABALLS scripts/demo-run.sh`, then `RESUME=1 SYMBOL=GABALLS scripts/demo-run.sh` after fixing a script bug
+(a `(( short += 0 ))` under `set -e` ended the first run silently right after the faucet step).
+
+| Step | Transaction |
+| --- | --- |
+| gaballs.testnet launches GABALLS (attached 4.2702 NEAR; get_launch_cost = 4260250000000000000000000 yocto) | [F9372pxn…](https://testnet.nearblocks.io/txns/F9372pxnGfyXLdj5ajwhsdQR6RK2M7xLjmdbeDmgkQ52) |
+| buyer1.gaballs.testnet uses the faucet (+100 USDT) | [DpDFXXkV…](https://testnet.nearblocks.io/txns/DpDFXXkVipDUPDMYXrYSHvvyvDfXdGSWiAoPAftLwAcL) |
+| buyer2.gaballs.testnet uses the faucet (+100 USDT) | [F76Dinjy…](https://testnet.nearblocks.io/txns/F76DinjygQo19ymWjyDXCLPjC2gWxzAhMoqHYGAtUKnH) |
+| check: gaballs.gaballs.testnet has 0 access keys | — |
+| check: gaballs.gaballs.testnet code sha256 `a43447c8f8323d0643fc70e0cb6108b5be63b14083f805e40ea7e6d81a025935` == factory machine_code_sha256 `a43447c8f8323d0643fc70e0cb6108b5be63b14083f805e40ea7e6d81a025935`: yes | — |
+| gaballs.testnet sends 18.400000 USDT to buyer2.gaballs.testnet | [DqUSnce3…](https://testnet.nearblocks.io/txns/DqUSnce3QJ5U8Wu1o8TK9W7jofPK14pYyWJXHYdbwcRx) |
+| buyer1.gaballs.testnet registers on the GABALLS token (storage_deposit) | [7aBNBAdT…](https://testnet.nearblocks.io/txns/7aBNBAdTMAPv7kJe6BgjwsposT7s2P97krSzqNDzHC5e) |
+| buyer2.gaballs.testnet registers on the GABALLS token (storage_deposit) | [FLcp6i7Q…](https://testnet.nearblocks.io/txns/FLcp6i7QR1HQuJrYyZzHqrhESD75WHTc36XPzmQtUPTh) |
+| buyer1.gaballs.testnet opens 5 packs | [4EgeK8Pn…](https://testnet.nearblocks.io/txns/4EgeK8PnG7SLbnEudPGxku6fr1M4dNzhtQFU2q1o66dj) |
+| ↳ Common, Common, Rare, Rare, Common — VRF alpha `vrf:25482:buyer1.gaballs.testnet:gaballs.gaballs.testnet-0` (request 0) | — |
+| buyer2.gaballs.testnet opens 5 packs | [Hd2KCK8C…](https://testnet.nearblocks.io/txns/Hd2KCK8CSzwoD5JjArMoBVRDJe8uL7bMcN8SCeHVCve6) |
+| ↳ Common, Common, Common, Common, Common — VRF alpha `vrf:25502:buyer2.gaballs.testnet:gaballs.gaballs.testnet-1` (request 1) | — |
+| buyer1.gaballs.testnet opens 5 packs | [3zJjmZUM…](https://testnet.nearblocks.io/txns/3zJjmZUMMr8EkPb7ip9kBmuJMWfNvnP1Zx48ZuPUouJe) |
+| ↳ Common, Common, Common, Common, Common — VRF alpha `vrf:25519:buyer1.gaballs.testnet:gaballs.gaballs.testnet-2` (request 2) | — |
+| buyer2.gaballs.testnet opens 5 packs | [AxCRSx43…](https://testnet.nearblocks.io/txns/AxCRSx43aw7wkjXta5ypDaUrkizdzjcVVJuopMcJFPHf) |
+| ↳ Common, Rare, Common, Common, Common — VRF alpha `vrf:25538:buyer2.gaballs.testnet:gaballs.gaballs.testnet-3` (request 3) | — |
+| buyer1.gaballs.testnet calls sweep_fees | [6hGQiwAX…](https://testnet.nearblocks.io/txns/6hGQiwAXxSDmLDjHXumagqcVjjsgwyJe39W9fFouiWmS) |
+| NFT fee balance after sweep: 1.000000 USDT | — |
+| gaballs.testnet claims the Machine NFT fees | [D6uCgv7C…](https://testnet.nearblocks.io/txns/D6uCgv7C8d3hiadyYp4YBCnZDVR7Q1drpq88Xtg7xL8i) |
+| gaballs.testnet transfers the Machine NFT to buyer2.gaballs.testnet | [C5Wxta5V…](https://testnet.nearblocks.io/txns/C5Wxta5V5rL9NYAJhizEakZboPTEjPQUEYT4dyPd2Xv2) |
+| buyer1.gaballs.testnet opens 5 packs | [3LkqKoZ1…](https://testnet.nearblocks.io/txns/3LkqKoZ1nK9K4ngXUM9ArWN1N6WXJosqd82r9PtjWX9b) |
+| ↳ Common, Common, Common, Common, Epic — VRF alpha `vrf:25556:buyer1.gaballs.testnet:gaballs.gaballs.testnet-4` (request 4) | — |
+| buyer2.gaballs.testnet opens 5 packs | [61fb8fEu…](https://testnet.nearblocks.io/txns/61fb8fEu6WkHxmb6sZMyNG6Don6E6auMGXR93byyk817) |
+| ↳ Common, Common, Common, Common, Common — VRF alpha `vrf:25570:buyer2.gaballs.testnet:gaballs.gaballs.testnet-5` (request 5) | — |
+| buyer2.gaballs.testnet calls sweep_fees | [GwR6yZkC…](https://testnet.nearblocks.io/txns/GwR6yZkC248snHHbN5RPtzRrjAJ3cZNu59NixADwHpXE) |
+| NFT fee balance after second sweep: 0.500000 USDT | — |
+| gaballs.testnet (old owner) tries to claim — rejected as expected (Only the current owner can claim) | [5XDZCnPg…](https://testnet.nearblocks.io/txns/5XDZCnPg51umch6kijuMu4BCu8YZzsg8QVtoxE4HwGwv) |
+| buyer2.gaballs.testnet (new owner) claims | [DvEVgWP6…](https://testnet.nearblocks.io/txns/DvEVgWP6cn83jxeSH4azaqihS7Z5YBAzQVQLkMzeggco) |
+| buyer1.gaballs.testnet sells half its GABALLS (quote: 71.799190 USDT; min_usdt_out = quote) | [Do4hPb7o…](https://testnet.nearblocks.io/txns/Do4hPb7oYPV3vaVUjbYYMvRzer2oSVdK15SWMLg2ugHq) |
+| ↳ sold 16313015 tokens: 72.305326 USDT out of the curve, fees 0.506136, buyer1.gaballs.testnet received 71.799190 USDT | — |
+
+Result:
+
+- machine: `gaballs.gaballs.testnet` (Machine NFT `machine:gaballs.gaballs.testnet`, owner now `buyer2.gaballs.testnet`)
+- randomness: OutLayer VRF (outlayer.testnet, project zavodil2.testnet/vrf-ark); pending pulls: 0; refunds: 0
+- sells: 1; tokens sold back: 16313015; USDT paid to sellers: 71.799190
+- packs opened: 30; tiers (Common, Rare, Epic, Mythic): 26, 3, 1, 0; capped pulls: 0
+- best multiplier hit: 2.4999x
+- price: 0.0000043352 USDT/token; market cap: 4335.192082 USDT; vault: 113435797 tokens
+- fee history of machine:gaballs.gaballs.testnet: Credit 1.00 → Claim 1.00 → Credit 0.50 → Claim 0.50
+- platform fees received by platform.gaballs.testnet: 2.360000 USDT
+- gaballs.gaballs.testnet access keys: 0; gaballs.testnet NEAR left: 14.417210731736621799999989 NEAR
+
+## Squads
+
+Group gacha on **Sputnik DAO** (`sputnikv2.testnet`), no custom multisig: `scripts/squad-demo.sh`. The council is
+`swarna2003.testnet` (the human, who votes from the app), `buyer1` and `buyer2`; the script votes with buyer1 + buyer2,
+2 of 3. The "open packs" action uses 270 Tgas (the sandbox test found 230 Tgas to be the minimum that funds USDT →
+machine → VRF request + callback inside the 300 Tgas vote).
+
+| Step | Transaction |
+| --- | --- |
+| gaballs.testnet creates gaballs-squad.sputnikv2.testnet on sputnikv2.testnet (6 NEAR; council swarna2003.testnet, buyer1.gaballs.testnet, buyer2.gaballs.testnet; 2 of 3; bond 0.1 NEAR) | [A5F78LhA…](https://testnet.nearblocks.io/txns/A5F78LhAyrPhAeWXhgVSfoenHJBDKNoKztxQnoeCEMf8) |
+| check: threshold 2, council buyer2.gaballs.testnet, buyer1.gaballs.testnet, swarna2003.testnet, bond 100000000000000000000000 yocto; DAO code hash `880bae9a58c99ec1efe8b10cf834b3f0c0ebc7a05d71206f3c1202c4280952da` | — |
+| gaballs.testnet pays the DAO's storage on mock USDT | [CY5sM5vy…](https://testnet.nearblocks.io/txns/CY5sM5vy4SaTQpV62QjN9vCE2y1VjxZ8qvJAcgMH6Pdz) |
+| gaballs.testnet pays the DAO's storage on the gaballs.gaballs.testnet token | [2dgU55dC…](https://testnet.nearblocks.io/txns/2dgU55dCFjLwxzpfPrQ2fph1imTuBY6WAYZkfK5TZTXG) |
+| buyer1.gaballs.testnet chips in 49.500000 USDT | [cc2imGtc…](https://testnet.nearblocks.io/txns/cc2imGtcwSYPAUWp5ViaA2H3KVBSFWsyvxxPnB1noZH) |
+| buyer2.gaballs.testnet chips in 0.500000 USDT | [HNk2bcCe…](https://testnet.nearblocks.io/txns/HNk2bcCeNN7MpKHYERvB2tz6oY55A4fLjD7RnNz5hkHL) |
+| treasury: 50.000000 USDT | — |
+| buyer1.gaballs.testnet proposes: open 5 packs (ft_transfer_call, 270 Tgas) | [3rwRrc2g…](https://testnet.nearblocks.io/txns/3rwRrc2gym4QvGVxR1Bomkedo4rFdxGQ1eaKcHLiZLBe) |
+| ↳ proposal #0: Open 5 packs on gaballs.gaballs.testnet | — |
+| buyer1.gaballs.testnet approves proposal #0 | [FnvttJ31…](https://testnet.nearblocks.io/txns/FnvttJ31E5dckiCigb5ME5YghhRQBtnWzjLw531TehuW) |
+| buyer2.gaballs.testnet approves proposal #0 | [79uiAjGR…](https://testnet.nearblocks.io/txns/79uiAjGRp9S5rZKADjxuSWWNEmXoLBQkBx2B1P8ujHm5) |
+| ↳ proposal #0 status: Approved | — |
+| ↳ Common 0.7x, Common 0.7x, Rare 1.25x, Common 0.7x, Rare 1.25x — VRF alpha `vrf:25598:buyer2.gaballs.testnet:gaballs.gaballs.testnet-6` (signed by the deciding voter, paid to the DAO) | — |
+| ↳ prize in the treasury: 10,361,670 GABALLS | — |
+| buyer2.gaballs.testnet proposes: split 2,072,334 GABALLS to each member | [Bi3fbJkY…](https://testnet.nearblocks.io/txns/Bi3fbJkY5zSAJXGL72uEixw5LZgq23iwVf9JTjJC3cNb) |
+| ↳ proposal #1: Split the prize: 20% each | — |
+| buyer1.gaballs.testnet approves proposal #1 | [2PTnsY7R…](https://testnet.nearblocks.io/txns/2PTnsY7Rq2YLiuMEt66Hp7gN4AFinugL6y4jSS1Q4vr6) |
+| buyer2.gaballs.testnet approves proposal #1 | [66iYxDdV…](https://testnet.nearblocks.io/txns/66iYxDdVN5GLD2hsZATshZQdDk1qTg1rnMkuV18FK85G) |
+| ↳ proposal #1 status: Approved; balances: swarna2003.testnet 2,072,334, buyer1.gaballs.testnet 18,385,349, buyer2.gaballs.testnet 28,274,673 | — |
+| buyer1.gaballs.testnet proposes: sell the remaining 4,144,668 GABALLS (quote 18.292192 USDT, min 99%) | [2B5ucVd2…](https://testnet.nearblocks.io/txns/2B5ucVd2MVDNwiz1ZszNVZf4HPbfQN5cVjv5otvfHdKR) |
+| ↳ proposal #2: Sell the rest back to the curve | — |
+| buyer1.gaballs.testnet approves proposal #2 | [5iuR7dLt…](https://testnet.nearblocks.io/txns/5iuR7dLt8PqPQH55zCdMHCRnQQdL5ZFfPUfFxnnCpmuY) |
+| buyer2.gaballs.testnet approves proposal #2 | [9F2Dh8M5…](https://testnet.nearblocks.io/txns/9F2Dh8M5Pp3XpEWLMZ3idXvqAxo4eBRfCMsimAeUdpET) |
+| ↳ proposal #2 status: Approved; USDT back in the treasury: 18.292192 | — |
+| buyer2.gaballs.testnet gives the Machine NFT machine:gaballs.gaballs.testnet to the DAO | [3ppyf6q4…](https://testnet.nearblocks.io/txns/3ppyf6q4m4QaT3ekB5VZW87fVd8G6Cemmd4mXSyYwGaj) |
+| buyer1.gaballs.testnet opens 1 pack (fees for the squad's machine) | [9k7dCBKj…](https://testnet.nearblocks.io/txns/9k7dCBKjF9TK3Jx6poHMB74cXxyy571bH7myJVDdG91E) |
+| buyer2.gaballs.testnet calls sweep_fees (accrued fees → the Machine NFT) | [mFJ2VdBv…](https://testnet.nearblocks.io/txns/mFJ2VdBvTb573XeFEAvQ54tWqsuPu2GC5hvdf78PWEU) |
+| ↳ fee balance on machine:gaballs.gaballs.testnet (owned by the DAO): 0.753631 USDT | — |
+| buyer2.gaballs.testnet proposes: claim the machine's fees | [5ir1EMXP…](https://testnet.nearblocks.io/txns/5ir1EMXPpDt7srLziHmzMNDzoZ4Mm6BYFhi4V9UWdYSj) |
+| ↳ proposal #3: Claim machine fees | — |
+| buyer1.gaballs.testnet approves proposal #3 | [EZLPnbTU…](https://testnet.nearblocks.io/txns/EZLPnbTU4Ls6oEXHBhD8Fer9Bqe5HTQnYk2gA91d2gXv) |
+| buyer2.gaballs.testnet approves proposal #3 | [BN7DPkci…](https://testnet.nearblocks.io/txns/BN7DPkci2FjwGCAXubxdfdvAh72MULLMwmZEHvhtrHwa) |
+| ↳ proposal #3 status: Approved; fees claimed into the treasury: 0.753631 USDT | — |
+
+Result:
+
+- DAO: `gaballs-squad.sputnikv2.testnet` (Sputnik DAO v2 via `sputnikv2.testnet`), council swarna2003.testnet, buyer1.gaballs.testnet, buyer2.gaballs.testnet; 2 of 3
+- treasury: 19.045823 USDT, 0 GABALLS; owns `machine:gaballs.gaballs.testnet` (fee balance 0.000000 USDT)
+- proposals: open packs #0, split #1, sell #2, claim fees #3 — all Approved 
+- certificates owned by the DAO: none
+
+Through the app (dev signer as buyer1): proposal #4 "Open 1 pack" made and approved in the Squads page
+([5vWVBtNJ…](https://testnet.nearblocks.io/txns/5vWVBtNJinwdai1sR1ZnVyDsz4G4CqFtxEEfx4C6hf7D) is buyer1's vote); it waits at 1 of 2 approvals for the next member.
+
+---
+
+## Phase 5 deployment: GUMBALL (now legacy: first VRF version)
 
 The live app (https://gaballs.vercel.app) lists **`gumball.gaballs.testnet`** first. Machines launched before Phase 5
 (`gball`, `lfg`, `lfgg`) are keyless, so they cannot be upgraded: they keep block randomness, have no sell-back, and the

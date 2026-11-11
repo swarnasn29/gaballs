@@ -66,7 +66,7 @@ for b in "$B1" "$B2"; do
   fi
 done
 short=0
-for b in "$B1" "$B2"; do (( short += $(usdt_of "$b") < NEED ? NEED - $(usdt_of "$b") : 0 )); done
+for b in "$B1" "$B2"; do have="$(usdt_of "$b")"; short=$(( short + (have < NEED ? NEED - have : 0) )); done
 if (( short > 0 )) && (( $(usdt_of "$ROOT") < short )); then
   [[ "$(faucet_ready "$ROOT")" == yes ]] || { echo "faucet cooldown: buyers are $(usdt_amount $short) USDT short; retry in up to 1 hour" >&2; exit 1; }
   call "$ROOT uses the faucet (+100 USDT)" "$ROOT" "$USDT_ID" faucet '{}' '0 NEAR'

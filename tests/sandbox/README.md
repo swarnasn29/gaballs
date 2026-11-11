@@ -8,7 +8,7 @@ run step 2 inside WSL.
    This also builds `target/near/machine_test_hooks/` — a machine with a test-only `test_force_next_tier` method,
    used only by the forced-Mythic test. The deployable machine in `target/near/gaballs_machine/` does not contain it.
 2. `cd tests/sandbox && cargo test -- --nocapture --test-threads=1`
-   → `test result: ok. 5 passed`
+   → `test result: ok. 6 passed`
 
 Tests:
 - `launch_packs_sweep_claim_transfer_claim` — launch → faucet → storage_deposit → 20 packs → sweep_fees → creator
@@ -24,3 +24,8 @@ Tests:
   at the quote pays exactly `quote_sell().usdt_out`, and the machine's USDT equals R + unswept fees.
 - `longest_symbol_launch_mints_the_machine_nft` — a 12-character symbol (the maximum) still mints its Machine NFT at
   launch (regression: 0.05 NEAR for the mint was too little for longer machine accounts).
+- `sputnik_dao_squad_opens_packs_by_vote_and_receives_the_prize` — a real Sputnik DAO (`res/sputnikdao2-v3.31.wasm`,
+  the testnet factory's default code) with a 2-of-3 council: members chip in USDT; a gas search shows the smallest
+  `ft_transfer_call` action gas that opens a VRF pack by vote (230 Tgas); a 5-pack proposal settles with the proof
+  naming the deciding voter, the prize and a (forced) Mythic certificate land in the DAO; then split, sell-back and a
+  fee claim by proposal on a Machine NFT the DAO owns.

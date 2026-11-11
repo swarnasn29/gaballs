@@ -65,8 +65,36 @@ the app's "Verifiable randomness proof" link (`/proof`) re-checks both in the br
 curve would need more USDT than it holds or if the payout is below `min_usdt_out`. `quote_sell(amount)` shows the numbers
 first. If the USDT transfer fails, the callback puts the tokens, curve and fees back.
 
-Machines launched before Phase 5 (`gball`, `lfg`, `lfgg`) keep block randomness and have no sell-back: they are keyless
-and can never be upgraded, so the app labels them "v1 · block randomness".
+**The flagship is `gaballs.gaballs.testnet` ($GABALLS).** Machines are keyless and can never be upgraded, so older
+ones stay playable under "Legacy machines" in the app: `gball`, `lfg`, `lfgg` (v1: block randomness, no sell-back) and
+`gumball`, `bubbles` (the first VRF version, whose proof check required the payer to sign, so squads could not pull).
+The current machine accepts a proof signed by any account as long as it carries this pull's unique seed; why that is
+safe is in [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md).
+
+## Social Money: Squads
+
+**Built on Sputnik DAO (`sputnikv2.testnet`), no custom multisig.** A squad is a standard Sputnik DAO v2 whose council
+is its members: they chip in USDT, vote on FunctionCall proposals to open packs on the flagship machine, and split the
+prize, sell it back, or claim the fees of a Machine NFT the squad owns. The app's **Squads** page builds each proposal;
+`scripts/squad-demo.sh` proves the whole loop on testnet. All links below are in [docs/DEPLOYMENTS.md](docs/DEPLOYMENTS.md#squads).
+
+| What | Proof |
+| --- | --- |
+| The squad DAO, created on the Sputnik factory (council swarna2003, buyer1, buyer2; 2 of 3) | [`gaballs-squad.sputnikv2.testnet`](https://testnet.nearblocks.io/address/gaballs-squad.sputnikv2.testnet) · creation [A5F78LhA…](https://testnet.nearblocks.io/txns/A5F78LhAyrPhAeWXhgVSfoenHJBDKNoKztxQnoeCEMf8) |
+| Members chip in USDT | [cc2imGtc…](https://testnet.nearblocks.io/txns/cc2imGtcwSYPAUWp5ViaA2H3KVBSFWsyvxxPnB1noZH), [HNk2bcCe…](https://testnet.nearblocks.io/txns/HNk2bcCeNN7MpKHYERvB2tz6oY55A4fLjD7RnNz5hkHL) |
+| Proposal #0: open 5 packs (USDT `ft_transfer_call` from the DAO, 270 Tgas) | proposed [3rwRrc2g…](https://testnet.nearblocks.io/txns/3rwRrc2gym4QvGVxR1Bomkedo4rFdxGQ1eaKcHLiZLBe) |
+| Votes: buyer1 approves, buyer2's approval executes it | [FnvttJ31…](https://testnet.nearblocks.io/txns/FnvttJ31E5dckiCigb5ME5YghhRQBtnWzjLw531TehuW), [79uiAjGR…](https://testnet.nearblocks.io/txns/79uiAjGRp9S5rZKADjxuSWWNEmXoLBQkBx2B1P8ujHm5) |
+| The pull: 5 packs settled by an OutLayer VRF proof (signed by the voter, paid to the DAO); 10,361,670 GABALLS land in the treasury | same vote transaction; `get_recent_pulls` on `gaballs.gaballs.testnet` shows `buyer: gaballs-squad.sputnikv2.testnet` |
+| Proposal #1: split 20% to each member (registers them on the token first) | [Bi3fbJkY…](https://testnet.nearblocks.io/txns/Bi3fbJkY5zSAJXGL72uEixw5LZgq23iwVf9JTjJC3cNb) → executed [66iYxDdV…](https://testnet.nearblocks.io/txns/66iYxDdVN5GLD2hsZATshZQdDk1qTg1rnMkuV18FK85G) |
+| Proposal #2: sell the rest back; 18.292192 USDT returns to the treasury | [2B5ucVd2…](https://testnet.nearblocks.io/txns/2B5ucVd2MVDNwiz1ZszNVZf4HPbfQN5cVjv5otvfHdKR) → executed [9F2Dh8M5…](https://testnet.nearblocks.io/txns/9F2Dh8M5Pp3XpEWLMZ3idXvqAxo4eBRfCMsimAeUdpET) |
+| Co-owned machine: the GABALLS Machine NFT is given to the DAO | [3ppyf6q4…](https://testnet.nearblocks.io/txns/3ppyf6q4m4QaT3ekB5VZW87fVd8G6Cemmd4mXSyYwGaj) |
+| Fee claim by vote (proposal #3): 0.753631 USDT of fees into the treasury | swept [mFJ2VdBv…](https://testnet.nearblocks.io/txns/mFJ2VdBvTb573XeFEAvQ54tWqsuPu2GC5hvdf78PWEU), proposed [5ir1EMXP…](https://testnet.nearblocks.io/txns/5ir1EMXPpDt7srLziHmzMNDzoZ4Mm6BYFhi4V9UWdYSj), executed [BN7DPkci…](https://testnet.nearblocks.io/txns/BN7DPkci2FjwGCAXubxdfdvAh72MULLMwmZEHvhtrHwa) |
+
+Check it yourself: `near contract call-function as-read-only gaballs-squad.sputnikv2.testnet get_proposals json-args
+'{"from_index":0,"limit":10}' network-config testnet now` (statuses and votes), and `get_policy` (council, threshold 2).
+The DAO's code hash is the factory's default (`AA4nA45v…dgcH`, Sputnik v3.31); the sandbox test
+`sputnik_dao_squad_opens_packs_by_vote_and_receives_the_prize` runs that same wasm (`tests/sandbox/res/`).
+Trezu was not linked: we found no sign it supports testnet DAOs, so the app links each squad on nearblocks.
 
 ## 5. Reproduce locally
 
@@ -83,7 +111,7 @@ _TBD — exact versions of Rust, cargo-near, near-cli-rs, Node._
    Output: `target/near/{gaballs_factory,gaballs_machine,gaballs_nft,gaballs_mock_usdt}/*.wasm`, plus
    `target/near/machine_test_hooks/gaballs_machine.wasm` (sandbox tests only, never deployed).
 3. Sandbox integration tests (Linux/macOS, or WSL on Windows): `cd tests/sandbox && cargo test -- --nocapture --test-threads=1`
-   → `test result: ok. 5 passed`. See [tests/sandbox/README.md](tests/sandbox/README.md).
+   → `test result: ok. 6 passed`. See [tests/sandbox/README.md](tests/sandbox/README.md).
 
 Windows note: `.cargo/config.toml` sets `AWS_LC_SYS_PREBUILT_NASM_x86_64_pc_windows_msvc` so the test
 dependencies build without installing NASM. The variable is target-specific and is ignored on macOS/Linux.
@@ -120,9 +148,9 @@ empty stub, and the post-build check fails the build if any trace remains.
 
 _TBD — e.g. `near account list-keys <machine>.testnet` shows no full-access key; odds readable via `get_odds`._
 
-**Check a pull's randomness yourself** (any Phase 5 machine, e.g. `gumball.gaballs.testnet`):
+**Check a pull's randomness yourself** (on the flagship machine `gaballs.gaballs.testnet`, or any VRF machine):
 
-1. `near contract call-function as-read-only gumball.gaballs.testnet get_recent_pulls json-args '{}' network-config testnet now`
+1. `near contract call-function as-read-only gaballs.gaballs.testnet get_recent_pulls json-args '{}' network-config testnet now`
    → each pull has `vrf_alpha`, `vrf_signature`, `roll`, `request_id`.
 2. `curl -s https://testnet-api.outlayer.ai/vrf/pubkey` → the same key as `get_machine().config.vrf.pubkey_hex`.
 3. In Node (no packages needed), with `A` = the alpha, `S` = the signature hex, `K` = the key hex:
@@ -146,6 +174,8 @@ See [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md).
 - uint 0.10.2 — 256-bit integers for the curve maths
 - OutLayer VRF (outlayer.testnet, the OutLayer team's `zavodil2.testnet/vrf-ark` project) — verifiable randomness;
   the request/callback pattern follows [out-layer/vrf-example](https://github.com/out-layer/vrf-example)
+- Sputnik DAO v2 (`sputnikv2.testnet`, contract v3.31 from near-daos/sputnik-dao-contract) — squads; its wasm is
+  used unmodified in the sandbox tests
 - ed25519-dalek 2.2 — tests only: signs stand-in VRF proofs (unit tests, `contracts/mock-outlayer` sandbox tests)
 - near-sandbox 0.4.0 + near-api 0.8 — sandbox integration tests (`tests/sandbox`)
 - Next.js 16, React 19, Tailwind CSS 4, Motion 14 — frontend (`app/`, scaffolded with `create-next-app`)

@@ -6,7 +6,7 @@ import { mkdirSync } from 'node:fs';
 
 const out = process.argv[2] ?? 'verify-pending';
 const B = 'http://127.0.0.1:3000';
-const machineId = process.env.MACHINE_ID ?? 'gumball.gaballs.testnet';
+const machineId = process.env.MACHINE_ID ?? 'gaballs.gaballs.testnet';
 mkdirSync(out, { recursive: true });
 const t0 = Date.now();
 const log = (m) => console.log(`[${((Date.now() - t0) / 1000).toFixed(0)}s] ${m}`);

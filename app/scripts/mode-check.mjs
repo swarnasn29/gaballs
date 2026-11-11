@@ -8,7 +8,7 @@ import { mkdirSync } from 'node:fs';
 
 const base = process.argv[2] ?? 'http://localhost:3000';
 const out = process.argv[3] ?? 'mode-check';
-const machineId = process.env.MACHINE_ID ?? 'gumball.gaballs.testnet';
+const machineId = process.env.MACHINE_ID ?? 'gaballs.gaballs.testnet';
 mkdirSync(out, { recursive: true });
 
 const PHONE = { viewport: { width: 412, height: 915 }, deviceScaleFactor: 2.6, isMobile: true, hasTouch: true };

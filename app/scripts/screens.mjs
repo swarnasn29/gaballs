@@ -7,7 +7,7 @@ import { mkdirSync } from 'node:fs';
 
 const base = process.argv[2] ?? 'http://localhost:3000';
 const out = process.argv[3] ?? 'screens';
-const machineId = process.env.MACHINE_ID ?? 'gumball.gaballs.testnet';
+const machineId = process.env.MACHINE_ID ?? 'gaballs.gaballs.testnet';
 mkdirSync(out, { recursive: true });
 
 const pages = [

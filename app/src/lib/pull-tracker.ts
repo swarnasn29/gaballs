@@ -109,3 +109,26 @@ export async function loadInbox(account: string, machineId: string): Promise<Pul
     refunded,
   };
 }
+
+/** Whether this browser already played the reveal for `requestId` (a squad's pulls are checked this way). */
+export function isOpened(account: string, machineId: string, requestId: number): boolean {
+  return load()[account]?.[machineId]?.opened.includes(requestId) ?? false;
+}
+
+/** Squads remembered in this browser (created or opened here), newest first. */
+const SQUADS_KEY = 'gaballs:squads';
+export function rememberedSquads(): string[] {
+  try {
+    return JSON.parse(localStorage.getItem(SQUADS_KEY) ?? '[]') as string[];
+  } catch {
+    return [];
+  }
+}
+export function rememberSquad(dao: string) {
+  const list = [dao, ...rememberedSquads().filter((d) => d !== dao)].slice(0, 12);
+  try {
+    localStorage.setItem(SQUADS_KEY, JSON.stringify(list));
+  } catch {
+    /* private mode */
+  }
+}

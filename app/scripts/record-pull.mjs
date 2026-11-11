@@ -7,7 +7,7 @@ import { mkdirSync, renameSync } from 'node:fs';
 const kind = process.argv[2] ?? 'desktop';
 const base = process.argv[3] ?? 'http://127.0.0.1:3000';
 const out = process.argv[4] ?? 'recordings';
-const machine = process.env.MACHINE_ID ?? 'gumball.gaballs.testnet';
+const machine = process.env.MACHINE_ID ?? 'gaballs.gaballs.testnet';
 mkdirSync(out, { recursive: true });
 
 const phone = kind === 'phone';

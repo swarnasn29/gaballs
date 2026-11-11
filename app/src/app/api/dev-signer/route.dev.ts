@@ -6,13 +6,15 @@
 import { readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { Account, JsonRpcProvider, KeyPairSigner, actions, type KeyPairString } from 'near-api-js';
+import { Account, FailoverRpcProvider, JsonRpcProvider, KeyPairSigner, actions, type KeyPairString } from 'near-api-js';
 
 const NETWORK = process.env.NEXT_PUBLIC_NETWORK_ID ?? 'testnet';
 const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL ?? 'https://test.rpc.fastnear.com';
 const FACTORY = process.env.NEXT_PUBLIC_FACTORY_ID ?? '';
 const ALLOWED_RECEIVERS = [FACTORY, process.env.NEXT_PUBLIC_NFT_ID, process.env.NEXT_PUBLIC_USDT_ID].filter(Boolean);
 const ACCOUNT = process.env.DEV_SIGNER_ACCOUNT ?? `buyer1.${FACTORY}`;
+// Squad DAOs (Sputnik) the test account is a member of, so Squads proposals and votes can be scripted locally.
+const SPUTNIK = process.env.NEXT_PUBLIC_SPUTNIK_FACTORY ?? 'sputnikv2.testnet';
 
 type IncomingTx = {
   receiverId: string;
@@ -39,7 +41,7 @@ function guard(req: Request): Response | null {
 }
 
 function receiverAllowed(id: string) {
-  return ALLOWED_RECEIVERS.includes(id) || (FACTORY !== '' && id.endsWith(`.${FACTORY}`));
+  return ALLOWED_RECEIVERS.includes(id) || (FACTORY !== '' && id.endsWith(`.${FACTORY}`)) || id.endsWith(`.${SPUTNIK}`);
 }
 
 async function loadAccount(): Promise<Account> {
@@ -50,7 +52,12 @@ async function loadAccount(): Promise<Account> {
   } catch {
     throw new Error(`no readable key file for ${ACCOUNT} in ~/.near-credentials/${NETWORK}`);
   }
-  return new Account(ACCOUNT, new JsonRpcProvider({ url: RPC_URL }), KeyPairSigner.fromSecretKey(privateKey as KeyPairString));
+  // Public testnet endpoints from docs.near.org/api/rpc/providers. FastNEAR answers a rate limit with an error inside a
+  // normal JSON reply, which the failover provider does not treat as a failure, so it goes last here.
+  const provider = new FailoverRpcProvider(
+    ['https://testnet-rpc.intea.rs', 'https://near-testnet.drpc.org', RPC_URL].map((url) => new JsonRpcProvider({ url })),
+  );
+  return new Account(ACCOUNT, provider, KeyPairSigner.fromSecretKey(privateKey as KeyPairString));
 }
 
 export async function GET(req: Request) {

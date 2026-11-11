@@ -70,22 +70,44 @@ export function vaultHealth(m: MachineView) {
 }
 
 /**
- * Machines launched before Phase 5 roll on block randomness (env::random_seed) and have no sell-back. They can never be
- * upgraded (keyless), so the app labels them instead.
+ * Which generation a machine runs. Machines are keyless, so an older one can never be upgraded:
+ * - `current`: the code the factory launches today (verifiable randomness, sell-back, squads);
+ * - `vrf-solo`: the first VRF version — its proof check required the payer to sign, so squads (DAOs) cannot pull;
+ * - `v1`: block randomness and no sell-back.
  */
-export function RandomnessBadge({ view }: { view: MachineView | null }) {
+export type MachineGeneration = 'current' | 'vrf-solo' | 'v1';
+
+export function generationOf(view: MachineView | null, codeSha256: string | null, factoryCodeSha256: string | null) {
+  if (!view?.config.vrf) return 'v1' as const;
+  return codeSha256 && codeSha256 === factoryCodeSha256 ? ('current' as const) : ('vrf-solo' as const);
+}
+
+export function RandomnessBadge({ view, generation }: { view: MachineView | null; generation?: MachineGeneration }) {
   if (!view) return null;
-  return view.config.vrf ? (
-    <span className="w-fit rounded-full bg-good/15 px-2.5 py-0.5 text-xs font-bold text-good">Verifiable randomness (VRF)</span>
-  ) : (
+  const g = generation ?? (view.config.vrf ? 'current' : 'v1');
+  if (g === 'current')
+    return (
+      <span className="w-fit rounded-full bg-good/15 px-2.5 py-0.5 text-xs font-bold text-good">
+        Verifiable randomness (VRF) · Squads
+      </span>
+    );
+  return (
     <span className="w-fit rounded-full bg-blush px-2.5 py-0.5 text-xs font-bold text-plum ring-1 ring-lilac">
-      v1 · block randomness · no sell-back
+      {g === 'vrf-solo' ? 'Earlier VRF version · no squads' : 'v1 · block randomness · no sell-back'}
     </span>
   );
 }
 
 /** Home-screen card: market cap, packs opened, best multiplier, price. */
-export function MachineCard({ info, view }: { info: MachineInfo; view: MachineView | null }) {
+export function MachineCard({
+  info,
+  view,
+  generation,
+}: {
+  info: MachineInfo;
+  view: MachineView | null;
+  generation?: MachineGeneration;
+}) {
   const id = info.account_id;
   return (
     <Card className="flex flex-col gap-4">
@@ -99,7 +121,7 @@ export function MachineCard({ info, view }: { info: MachineInfo; view: MachineVi
           </p>
         </div>
       </Link>
-      <RandomnessBadge view={view} />
+      <RandomnessBadge view={view} generation={generation} />
       {view ? (
         <dl className="grid grid-cols-2 gap-2">
           <Stat label="Market cap" value={fmtUsdtCompact(view.market_cap_usdt)} source={{ contract: id, method: 'get_machine' }} />

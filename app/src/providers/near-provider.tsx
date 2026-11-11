@@ -9,7 +9,7 @@ import type { EventMap, NearConnector, NearWalletBase } from '@hot-labs/near-con
 
 import { DevSignerBadge, devSignAndSend, devSignerAccount } from 'gaballs-dev-signer';
 
-import { NETWORK, RPC_URL } from '@/config';
+import { NETWORK, RPC_FALLBACKS, RPC_URL } from '@/config';
 import type { Tx } from '@/near/contracts';
 import type { ExecutionOutcome } from '@/near/outcome';
 
@@ -55,7 +55,7 @@ export function NearProvider({ children }: PropsWithChildren) {
       ({ NearConnector }) =>
         new NearConnector({
           network: NETWORK,
-          providers: { mainnet: ['https://free.rpc.fastnear.com'], testnet: [RPC_URL] },
+          providers: { mainnet: ['https://free.rpc.fastnear.com'], testnet: [RPC_URL, ...RPC_FALLBACKS] },
         }),
     );
     return connectorRef.current;
