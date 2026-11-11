@@ -75,6 +75,8 @@ Self-check scripts (`app/scripts/`): `screens.mjs` (390/1440 screenshots + styli
 **Dev test signer (local automation only).** With `DEV_SIGNER=1` in `app/.env.local` and `npm run dev:signer`
 (listens on 127.0.0.1 only), the app can sign as a test account using its key from `~/.near-credentials`; the key
 stays on the local server and is never sent to the browser, and a striped "DEV SIGNER" banner is always shown.
+All three are required: `npm run dev:signer` sets a launcher-only flag, so plain `npm run dev` keeps the signer off
+(`/api/dev-signer` returns 404) even when `DEV_SIGNER=1` is in `.env.local`.
 Production builds don't contain it: `.dev.ts(x)` files are only routes in that mode, the browser import resolves to an
 empty stub, and the post-build check fails the build if any trace remains.
 

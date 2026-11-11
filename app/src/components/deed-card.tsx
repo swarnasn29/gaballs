@@ -101,12 +101,13 @@ export function DeedCard({
   }
 
   return (
-    <li ref={card} className="relative overflow-hidden rounded-[2rem] px-7 py-6">
-      {/* eslint-disable-next-line @next/next/no-img-element -- deed frame art from the manifest */}
-      <img src={art.cards.deed} alt="" className="absolute inset-0 h-full w-full object-fill" />
-      <div className="relative">
-        <p className="text-xs font-bold uppercase tracking-wider text-plum">Machine deed · NFT</p>
-        <Link href={`/machine/${machineId}`} className="font-display text-2xl font-bold text-grape underline-offset-4 hover:underline">
+    // The frame is drawn with CSS (not the stretched frame art) so the border and seal keep their shape at any width.
+    <li ref={card} className="relative overflow-hidden rounded-[2rem] border-8 border-grape bg-blush p-2.5">
+      {/* eslint-disable-next-line @next/next/no-img-element -- seal art from the manifest */}
+      <img src={art.fx.coin} alt="" aria-hidden className="absolute right-5 top-5 h-11 w-11" />
+      <div className="relative rounded-[1.25rem] border-[3px] border-lilac px-4 py-4 sm:px-6">
+        <p className="pr-12 text-xs font-bold uppercase tracking-wider text-plum">Machine deed · NFT</p>
+        <Link href={`/machine/${machineId}`} className="block break-words pr-12 font-display text-2xl font-bold text-grape underline-offset-4 hover:underline">
           {machineId}
         </Link>
         <dl className="mt-3 grid grid-cols-2 gap-2">

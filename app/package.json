@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "check:no-dev-signer": "node scripts/check-no-dev-signer.mjs",
-    "dev:signer": "next dev -H 127.0.0.1 -p 3000"
+    "dev:signer": "node scripts/dev-signer.mjs"
   },
   "dependencies": {
     "@hot-labs/near-connect": "^0.11.4",

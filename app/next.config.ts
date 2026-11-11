@@ -8,11 +8,11 @@ const root = path.resolve(__dirname);
 // DEV TEST SIGNER (src/app/api/dev-signer/route.dev.ts, src/dev/*): only when running `next dev` with DEV_SIGNER=1.
 // Files ending in .dev.ts/.dev.tsx are routes/pages ONLY in that mode, so production builds never compile them.
 // scripts/check-no-dev-signer.mjs runs after every `next build` (including Vercel) and fails if any trace remains.
-// It also requires the dev server to be bound to 127.0.0.1 (`npm run dev:signer`), so a plain `npm run dev` — which
-// listens on the whole network — never enables it, even if DEV_SIGNER=1 is set in .env.local.
-const hostArg = process.argv[process.argv.indexOf("-H") + 1] ?? process.argv[process.argv.indexOf("--hostname") + 1];
-const localOnly = process.argv.includes("-H") || process.argv.includes("--hostname") ? hostArg === "127.0.0.1" : false;
-const devSigner = process.env.NODE_ENV === "development" && process.env.DEV_SIGNER === "1" && localOnly;
+// It also requires GABALLS_DEV_SIGNER_LOCAL=1, which only `npm run dev:signer` (scripts/dev-signer.mjs) sets — and that
+// launcher binds the server to 127.0.0.1. So a plain `npm run dev` (listening on the whole network) never enables it,
+// even if DEV_SIGNER=1 is in .env.local. (next.config runs in a child process, so CLI flags can't be checked here.)
+const devSigner =
+  process.env.NODE_ENV === "development" && process.env.DEV_SIGNER === "1" && process.env.GABALLS_DEV_SIGNER_LOCAL === "1";
 
 const nextConfig: NextConfig = {
   cacheComponents: true,
