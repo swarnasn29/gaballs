@@ -26,7 +26,7 @@ async function RawResult({ searchParams }: { searchParams: Params }) {
         .
       </p>
       <p className="text-sm">Reproduce it yourself:</p>
-      <pre className="overflow-x-auto rounded-2xl bg-ink p-3 text-xs text-blush">{cli}</pre>
+      <pre className="whitespace-pre-wrap break-all rounded-2xl bg-ink p-3 text-xs text-blush">{cli}</pre>
       <pre className="max-h-[60vh] overflow-auto rounded-2xl bg-blush p-3 text-xs text-ink">{body}</pre>
     </>
   );

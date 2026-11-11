@@ -38,6 +38,9 @@ function autoReason(): string | null {
   const cores = navigator.hardwareConcurrency ?? 8;
   const memory = (navigator as Navigator & { deviceMemory?: number }).deviceMemory ?? 8;
   if (cores <= 4 || memory <= 4) return 'low-power device';
+  // Phones: the 3D engine (~1 MB) blocks the main thread for seconds on mid-range Android right after load, so
+  // phones start in 2D; one tap on "Switch to 3D" turns it on and is remembered.
+  if (window.matchMedia('(max-width: 640px) and (pointer: coarse)').matches) return 'phone';
   return null;
 }
 
@@ -58,6 +61,7 @@ function subscribe(cb: () => void) {
   const mq = [
     window.matchMedia('(prefers-reduced-motion: reduce)'),
     window.matchMedia('(max-width: 640px), (pointer: coarse)'),
+    window.matchMedia('(max-width: 640px) and (pointer: coarse)'),
   ];
   mq.forEach((m) => m.addEventListener('change', cb));
   return () => {

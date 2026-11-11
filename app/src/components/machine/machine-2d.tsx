@@ -73,13 +73,22 @@ export function Machine2D({
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={art.machine.flat} alt="" className="absolute inset-0 h-full w-full" draggable={false} />
         {balls.map((b, i) => (
-          <motion.span
+          <span
             key={i}
             aria-hidden
-            className="absolute rounded-full shadow-[inset_-3px_-4px_0_rgba(0,0,0,0.12),inset_3px_3px_0_rgba(255,255,255,0.45)]"
-            style={{ left: pct(b.x - BALL / 2, VB.w), top: pct(b.y - BALL / 2, VB.h), width: pct(BALL, VB.w), aspectRatio: '1', background: b.color }}
-            animate={pending && !reduced ? { y: [0, -10 - (i % 4) * 4, 0] } : { y: 0 }}
-            transition={pending && !reduced ? { duration: 0.35 + (i % 5) * 0.05, repeat: Infinity, delay: (i % 7) * 0.04 } : { duration: 0.2 }}
+            className={`absolute rounded-full shadow-[inset_-3px_-4px_0_rgba(0,0,0,0.12),inset_3px_3px_0_rgba(255,255,255,0.45)] ${pending && !reduced ? 'gumball-hop' : ''}`}
+            style={
+              {
+                left: pct(b.x - BALL / 2, VB.w),
+                top: pct(b.y - BALL / 2, VB.h),
+                width: pct(BALL, VB.w),
+                aspectRatio: '1',
+                background: b.color,
+                '--hop': `${-10 - (i % 4) * 4}px`,
+                '--dur': `${0.35 + (i % 5) * 0.05}s`,
+                '--delay': `${(i % 7) * 0.04}s`,
+              } as React.CSSProperties
+            }
           />
         ))}
         {/* crank knob */}

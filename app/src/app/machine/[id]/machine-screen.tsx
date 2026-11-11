@@ -62,18 +62,17 @@ export function MachineScreen({ id }: { id: string }) {
             ${meta.data?.symbol ?? '…'} · {id}
           </p>
         </div>
-        {v && (
-          <dl className="grid w-full grid-cols-2 gap-2 sm:w-auto sm:grid-cols-4">
-            <Stat label="Price" value={fmtPrice(v.price_usdt_wad)} source={{ contract: id, method: 'get_machine' }} />
-            <Stat label="Market cap" value={fmtUsdtCompact(v.market_cap_usdt)} source={{ contract: id, method: 'get_machine' }} />
-            <Stat label="Packs" value={v.packs_opened.toLocaleString('en-US')} source={{ contract: id, method: 'get_machine' }} />
-            <Stat
-              label="Best hit"
-              value={v.best_multiplier_bps ? fmtMultiplier(v.best_multiplier_bps) : '—'}
-              source={{ contract: id, method: 'get_machine' }}
-            />
-          </dl>
-        )}
+        {/* rendered while loading too (values "…"), so the page doesn't jump when get_machine() answers */}
+        <dl className="grid w-full grid-cols-2 gap-2 sm:w-auto sm:grid-cols-4">
+          <Stat label="Price" value={v ? fmtPrice(v.price_usdt_wad) : '…'} source={{ contract: id, method: 'get_machine' }} />
+          <Stat label="Market cap" value={v ? fmtUsdtCompact(v.market_cap_usdt) : '…'} source={{ contract: id, method: 'get_machine' }} />
+          <Stat label="Packs" value={v ? v.packs_opened.toLocaleString('en-US') : '…'} source={{ contract: id, method: 'get_machine' }} />
+          <Stat
+            label="Best hit"
+            value={!v ? '…' : v.best_multiplier_bps ? fmtMultiplier(v.best_multiplier_bps) : '—'}
+            source={{ contract: id, method: 'get_machine' }}
+          />
+        </dl>
       </Card>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,420px)]">
@@ -87,31 +86,36 @@ export function MachineScreen({ id }: { id: string }) {
             onCrank={open}
             onCapsulesOut={onCapsulesOut}
           />
-          {v && health && (
-            <Card className="w-full max-w-md">
-              <div className="flex items-center justify-between">
-                <h2 className="text-xl font-bold">Prize vault</h2>
-                <span className="rounded-full bg-blush px-3 py-1 text-sm font-bold text-grape">{health.label}</span>
-              </div>
-              <div
-                className="mt-2 h-4 overflow-hidden rounded-full bg-blush"
-                role="meter"
-                aria-valuemin={0}
-                aria-valuemax={100}
-                aria-valuenow={Math.min(health.pct, 100)}
-                aria-label="Vault compared to its launch size"
-              >
-                <div className="h-full rounded-full bg-grape" style={{ width: `${Math.min(health.pct, 100)}%` }} />
-              </div>
-              <p className="mt-2 text-sm">
-                {fmtTokens(v.vault)} tokens ({health.pct}% of launch). One winning pull can take at most{' '}
-                {v.config.max_vault_draw_bps / 100}% of it.
-              </p>
-            </Card>
-          )}
+          <Card className="w-full max-w-md">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-bold">Prize vault</h2>
+              <span className="rounded-full bg-blush px-3 py-1 text-sm font-bold text-grape">{health?.label ?? '…'}</span>
+            </div>
+            {v && health ? (
+              <>
+                <div
+                  className="mt-2 h-4 overflow-hidden rounded-full bg-blush"
+                  role="meter"
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={Math.min(health.pct, 100)}
+                  aria-label="Vault compared to its launch size"
+                >
+                  <div className="h-full rounded-full bg-grape" style={{ width: `${Math.min(health.pct, 100)}%` }} />
+                </div>
+                <p className="mt-2 text-sm">
+                  {fmtTokens(v.vault)} tokens ({health.pct}% of launch). One winning pull can take at most{' '}
+                  {v.config.max_vault_draw_bps / 100}% of it.
+                </p>
+              </>
+            ) : (
+              // same height as the loaded content: bar + two lines of text
+              <div aria-hidden className="mt-2 h-[4.25rem] rounded-2xl bg-blush/60" />
+            )}
+          </Card>
         </div>
 
-        <Card className="flex flex-col gap-4">
+        <Card className="flex flex-col gap-4 self-start">
           <BuyPanel
             account={pull.account}
             count={count}
@@ -146,3 +150,4 @@ export function MachineScreen({ id }: { id: string }) {
     </div>
   );
 }
+

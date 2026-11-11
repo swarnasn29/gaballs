@@ -61,3 +61,17 @@ h3,
     transition-duration: 0.01ms !important;
   }
 }
+
+/* 2D machine: gumballs hop while a pack is pending (plain CSS: dozens of balls, no per-ball JS animation work) */
+@keyframes gumball-hop {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(var(--hop));
+  }
+}
+.gumball-hop {
+  animation: gumball-hop var(--dur) ease-in-out var(--delay) infinite;
+}

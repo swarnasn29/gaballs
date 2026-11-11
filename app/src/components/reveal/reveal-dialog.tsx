@@ -162,7 +162,7 @@ export function RevealDialog({
                   type="button"
                   onClick={stage === 'closed' ? crack : undefined}
                   aria-label={`Tap to open capsule${multi ? ` ${i + 1} of ${pulls.length}` : ''}`}
-                  className="relative cursor-pointer rounded-full focus-visible:outline-4"
+                  className="relative cursor-pointer rounded-full outline-none focus-visible:ring-4 focus-visible:ring-white/90"
                   initial={{ scale: 0.6, opacity: 0 }}
                   animate={
                     stage === 'cracking'

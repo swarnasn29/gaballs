@@ -53,12 +53,14 @@ export function MachineStage(props: StageProps) {
   const quality = m?.quality ?? 'high';
   const show3d = m?.mode === '3d';
   const vaultPct = props.vaultPct;
+  // While get_machine() loads, the 2D machine shows an empty dome: same element as after loading, so the machine
+  // image paints once (good LCP) instead of being swapped for a new one when the data arrives.
   const flat = (
     <Machine2D
-      ballCount={ballCount(vaultPct ?? 100, 'low')}
+      ballCount={vaultPct === undefined ? 0 : ballCount(vaultPct, 'low')}
       phase={props.phase}
       capsules={props.capsules}
-      crankable={props.crankable}
+      crankable={vaultPct !== undefined && props.crankable}
       onCrank={props.onCrank}
       onCapsulesOut={props.onCapsulesOut}
     />
@@ -70,10 +72,7 @@ export function MachineStage(props: StageProps) {
         role="img"
         aria-label={`${LABEL[props.phase]}${vaultPct !== undefined ? ` ${ballCount(vaultPct, quality)} gumballs show the prize vault.` : ''}`}
       >
-        {vaultPct === undefined ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={art.machine.flat} alt="" className="absolute inset-0 m-auto h-[92%] opacity-60" />
-        ) : show3d ? (
+        {show3d && vaultPct !== undefined ? (
           <FallbackTo2D fallback={flat}>
             <Scene3D {...props} vaultPct={vaultPct} quality={quality} />
           </FallbackTo2D>
@@ -81,8 +80,10 @@ export function MachineStage(props: StageProps) {
           flat
         )}
       </div>
+      {/* the mode is only known in the browser: keep the pill's height reserved so nothing shifts when it appears */}
+      {!m && <div className="h-7" aria-hidden />}
       {m && (
-        <div className="flex items-center gap-2 rounded-full bg-white px-3 py-1 text-xs font-semibold text-grape shadow-chunky">
+        <div className="flex h-7 items-center gap-2 rounded-full bg-white px-3 py-1 text-xs font-semibold text-grape shadow-chunky">
           <span>{show3d ? '3D machine' : `2D machine${m.autoReason && !m.overridden ? ` (${m.autoReason})` : ''}`}</span>
           <button
             type="button"
