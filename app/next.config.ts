@@ -5,14 +5,25 @@ import type { NextConfig } from "next";
 // Next guess the wrong workspace root.
 const root = path.resolve(__dirname);
 
+// DEV TEST SIGNER (src/app/api/dev-signer/route.dev.ts, src/dev/*): only when running `next dev` with DEV_SIGNER=1.
+// Files ending in .dev.ts/.dev.tsx are routes/pages ONLY in that mode, so production builds never compile them.
+// scripts/check-no-dev-signer.mjs runs after every `next build` (including Vercel) and fails if any trace remains.
+const devSigner = process.env.NODE_ENV === "development" && process.env.DEV_SIGNER === "1";
+
 const nextConfig: NextConfig = {
   cacheComponents: true,
   partialPrefetching: true,
   // The dev-mode "N" badge covers content in screenshots.
   devIndicators: false,
   outputFileTracingRoot: root,
+  pageExtensions: devSigner ? ["dev.tsx", "dev.ts", "tsx", "ts"] : ["tsx", "ts"],
+  env: { NEXT_PUBLIC_DEV_SIGNER: devSigner ? "1" : "0" },
   turbopack: {
     root,
+    resolveAlias: {
+      // Real dev signer only in dev-signer mode; an empty stub everywhere else.
+      "gaballs-dev-signer": devSigner ? "./src/dev/dev-signer-client.dev.tsx" : "./src/dev/dev-signer-stub.ts",
+    },
     rules: {
       "*.css": {
         loaders: ["@tailwindcss/turbopack"],

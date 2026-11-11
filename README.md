@@ -62,6 +62,22 @@ _TBD — exact versions of Rust, cargo-near, near-cli-rs, Node._
 Windows note: `.cargo/config.toml` sets `AWS_LC_SYS_PREBUILT_NASM_x86_64_pc_windows_msvc` so the test
 dependencies build without installing NASM. The variable is target-specific and is ignored on macOS/Linux.
 
+### Frontend
+
+1. `cd app && cp .env.example .env.local && npm install`
+2. `npm run dev` → http://localhost:3000 (connect a NEAR **testnet** wallet; get mock USDT on "My stuff").
+3. `npm run build` → also runs `scripts/check-no-dev-signer.mjs` →
+   `check-no-dev-signer: OK — scanned N build files, no dev signer code`.
+
+Self-check scripts (`app/scripts/`): `screens.mjs` (390/1440 screenshots + styling checks), `machine-stills.mjs`
+(3D stills), `record-pull.mjs` (records a real testnet pull), `fps-check.mjs` (frame rate, desktop and throttled phone).
+
+**Dev test signer (local automation only).** With `DEV_SIGNER=1` in `app/.env.local` and `npm run dev:signer`
+(listens on 127.0.0.1 only), the app can sign as a test account using its key from `~/.near-credentials`; the key
+stays on the local server and is never sent to the browser, and a striped "DEV SIGNER" banner is always shown.
+Production builds don't contain it: `.dev.ts(x)` files are only routes in that mode, the browser import resolves to an
+empty stub, and the post-build check fails the build if any trace remains.
+
 ## 6. Verify the trust claims
 
 _TBD — e.g. `near account list-keys <machine>.testnet` shows no full-access key; odds readable via `get_odds`._
@@ -79,6 +95,12 @@ See [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md).
 - near-sdk 5.30.1 and near-contract-standards 5.30.1 (NEP-141/145/148 implementation) — contracts
 - uint 0.10.2 — 256-bit integers for the curve maths
 - near-sandbox 0.4.0 + near-api 0.8 — sandbox integration tests (`tests/sandbox`)
+- Next.js 16, React 19, Tailwind CSS 4, Motion 14 — frontend (`app/`, scaffolded with `create-next-app`)
+- @hot-labs/near-connect 0.11 + near-api-js 7 — wallet connection (per the NEAR `near-dapp` agent skill and the
+  `create-near-app` Next.js template)
+- three 0.187, @react-three/fiber 9, @react-three/drei 10, @react-three/rapier 2 — the 3D gumball machine, modelled in
+  code (`app/src/components/machine/scene3d.tsx`); Playwright — screenshots, recordings and checks
+- Fonts: Fredoka, Nunito (Google Fonts via `next/font`)
 - `cargo near new` template (cargo-near 0.23.0) — crate manifests and toolchain pin
 - Python 3.12, numpy, matplotlib — economics simulation (`sim/`)
 - AI-assisted: code in this repository was written with Claude Code (Anthropic)

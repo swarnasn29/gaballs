@@ -19,7 +19,8 @@
       }
     ],
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "gaballs-dev-signer": ["./src/dev/dev-signer-stub.ts"]
     }
   },
   "include": [

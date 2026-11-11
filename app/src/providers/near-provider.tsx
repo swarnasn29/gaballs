@@ -7,6 +7,8 @@
 import { createContext, type PropsWithChildren, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { EventMap, NearConnector, NearWalletBase } from '@hot-labs/near-connect';
 
+import { DevSignerBadge, devSignAndSend, devSignerAccount } from 'gaballs-dev-signer';
+
 import { NETWORK, RPC_URL } from '@/config';
 import type { Tx } from '@/near/contracts';
 import type { ExecutionOutcome } from '@/near/outcome';
@@ -26,11 +28,27 @@ type NearContextValue = {
 
 const NearContext = createContext<NearContextValue | undefined>(undefined);
 
+/**
+ * DEV TEST SIGNER switch. Constant `false` in every production build (NODE_ENV is inlined and next.config sets
+ * NEXT_PUBLIC_DEV_SIGNER only for `next dev` with DEV_SIGNER=1), and `gaballs-dev-signer` is then an empty stub.
+ * A connected real wallet always wins over the dev signer.
+ */
+const DEV_SIGNER_ACTIVE = process.env.NODE_ENV === 'development' && process.env.NEXT_PUBLIC_DEV_SIGNER === '1';
+
 export function NearProvider({ children }: PropsWithChildren) {
   const connectorRef = useRef<Promise<NearConnector> | null>(null);
   const [wallet, setWallet] = useState<NearWalletBase | undefined>();
-  const [signedAccountId, setSignedAccountId] = useState('');
+  const [walletAccountId, setSignedAccountId] = useState('');
   const [loading, setLoading] = useState(true);
+  const [devAccountId, setDevAccountId] = useState('');
+
+  useEffect(() => {
+    if (!DEV_SIGNER_ACTIVE) return;
+    void devSignerAccount().then((id) => setDevAccountId(id ?? ''));
+  }, []);
+
+  const usingDevSigner = DEV_SIGNER_ACTIVE && !wallet && devAccountId !== '';
+  const signedAccountId = walletAccountId || (usingDevSigner ? devAccountId : '');
 
   const getConnector = useCallback(() => {
     connectorRef.current ??= import('@hot-labs/near-connect').then(
@@ -98,18 +116,24 @@ export function NearProvider({ children }: PropsWithChildren) {
 
   const signAndSendTransactions = useCallback(
     async (txs: Tx[]) => {
+      if (!wallet && usingDevSigner) return devSignAndSend(txs);
       if (!wallet) throw new Error('Connect a wallet first');
       const outcomes = await wallet.signAndSendTransactions({ network: NETWORK, transactions: txs });
       return outcomes as unknown as ExecutionOutcome[];
     },
-    [wallet],
+    [wallet, usingDevSigner],
   );
 
   const value = useMemo(
     () => ({ loading, signedAccountId, signIn, signOut, signAndSendTransactions }),
     [loading, signedAccountId, signIn, signOut, signAndSendTransactions],
   );
-  return <NearContext.Provider value={value}>{children}</NearContext.Provider>;
+  return (
+    <NearContext.Provider value={value}>
+      {usingDevSigner && <DevSignerBadge accountId={devAccountId} />}
+      {children}
+    </NearContext.Provider>
+  );
 }
 
 export function useNearWallet(): NearContextValue {

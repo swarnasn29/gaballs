@@ -1,11 +1,15 @@
 'use client';
 
-import { art } from '@/art/manifest';
+import { useCallback, useState } from 'react';
+
 import { BuyPanel } from '@/components/buy-panel';
+import { MachineStage } from '@/components/machine/stage';
+import type { StagePhase } from '@/components/machine/shared';
 import { OddsTable, RiskNotice, TierDot, vaultHealth } from '@/components/machine-bits';
 import { Card, Stat } from '@/components/ui';
 import { EXPLORER_URL } from '@/config';
 import { fmtMultiplier, fmtPrice, fmtTokens, fmtUsdtCompact, shortAccount } from '@/lib/format';
+import { usePull } from '@/lib/use-pull';
 import { useView } from '@/lib/use-view';
 import { machine } from '@/near/contracts';
 
@@ -16,9 +20,30 @@ export function MachineScreen({ id }: { id: string }) {
   const pulls = useView(() => m.recentPulls(), id, 6000);
   const meta = useView(() => m.metadata(), id);
 
+  const refreshAll = useCallback(() => {
+    void view.refresh();
+    void pulls.refresh();
+  }, [view, pulls]);
+  const pull = usePull(id, refreshAll);
+  const [count, setCount] = useState(1);
+  const [capsuleOut, setCapsuleOut] = useState(false);
+
+  const open = useCallback(() => {
+    setCapsuleOut(false);
+    void pull.start(count);
+  }, [pull, count]);
+  const reset = useCallback(() => {
+    setCapsuleOut(false);
+    pull.reset();
+  }, [pull]);
+  const onCapsulesOut = useCallback(() => setCapsuleOut(true), []);
+
   if (view.error) return <Card>Could not load {id}: {view.error}</Card>;
   const v = view.data;
   const health = v ? vaultHealth(v) : undefined;
+  // Golden rule: the stage only shows a capsule once the contract's pack_opened result is in (phase "opened").
+  const stagePhase: StagePhase =
+    pull.state.phase === 'pending' ? 'pending' : pull.state.phase === 'opened' ? (capsuleOut ? 'resting' : 'dropping') : 'idle';
 
   return (
     <div className="flex flex-col gap-6">
@@ -46,8 +71,14 @@ export function MachineScreen({ id }: { id: string }) {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,420px)]">
         {/* Machine stage (3D machine arrives in step 2). */}
         <div className="flex flex-col items-center gap-4">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={art.machine.flat} alt="Gumball machine" className="w-64 drop-shadow-xl sm:w-80" />
+          <MachineStage
+            vaultPct={health?.pct}
+            phase={stagePhase}
+            capsules={pull.state.phase === 'opened' ? pull.state.pulls.length : 0}
+            crankable={!!pull.account && pull.state.phase === 'idle'}
+            onCrank={open}
+            onCapsulesOut={onCapsulesOut}
+          />
           {v && health && (
             <Card className="w-full max-w-md">
               <div className="flex items-center justify-between">
@@ -73,7 +104,15 @@ export function MachineScreen({ id }: { id: string }) {
         </div>
 
         <Card className="flex flex-col gap-4">
-          <BuyPanel machineId={id} onSettled={() => (view.refresh(), pulls.refresh())} />
+          <BuyPanel
+            account={pull.account}
+            count={count}
+            setCount={setCount}
+            state={pull.state}
+            capsuleOut={capsuleOut}
+            onOpen={open}
+            onReset={reset}
+          />
           {odds.data && <OddsTable odds={odds.data} machineId={id} />}
           <RiskNotice />
         </Card>

@@ -4,17 +4,23 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "next build && node scripts/check-no-dev-signer.mjs",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "check:no-dev-signer": "node scripts/check-no-dev-signer.mjs",
+    "dev:signer": "next dev -H 127.0.0.1 -p 3000"
   },
   "dependencies": {
     "@hot-labs/near-connect": "^0.11.4",
+    "@react-three/drei": "^10.7.9",
+    "@react-three/fiber": "^9.8.2",
+    "@react-three/rapier": "^2.2.0",
     "motion": "^14.12.0",
     "near-api-js": "^7.4.0",
     "next": "16.4.6",
     "react": "19.3.0",
-    "react-dom": "19.3.0"
+    "react-dom": "19.3.0",
+    "three": "^0.187.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.65.0",
@@ -22,6 +28,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/three": "^0.187.0",
     "eslint": "^9",
     "eslint-config-next": "16.4.6",
     "tailwindcss": "4.3.3",
