@@ -4,12 +4,12 @@ import { useCallback, useState } from 'react';
 
 import { BuyPanel } from '@/components/buy-panel';
 import { MachineStage } from '@/components/machine/stage';
+import { PullFeed } from '@/components/pull-feed';
 import { RevealDialog } from '@/components/reveal/reveal-dialog';
 import type { StagePhase } from '@/components/machine/shared';
-import { OddsTable, RiskNotice, TierDot, vaultHealth } from '@/components/machine-bits';
+import { OddsTable, RiskNotice, vaultHealth } from '@/components/machine-bits';
 import { Card, Stat } from '@/components/ui';
-import { EXPLORER_URL } from '@/config';
-import { fmtMultiplier, fmtPrice, fmtTokens, fmtUsdtCompact, shortAccount } from '@/lib/format';
+import { fmtMultiplier, fmtPrice, fmtTokens, fmtUsdtCompact } from '@/lib/format';
 import { usePull } from '@/lib/use-pull';
 import { useView } from '@/lib/use-view';
 import { machine } from '@/near/contracts';
@@ -18,7 +18,7 @@ export function MachineScreen({ id }: { id: string }) {
   const m = machine(id);
   const view = useView(() => m.get(), id, 6000);
   const odds = useView(() => m.odds(), id);
-  const pulls = useView(() => m.recentPulls(), id, 6000);
+  const pulls = useView(() => m.recentPulls(), id, 4000);
   const meta = useView(() => m.metadata(), id);
 
   const refreshAll = useCallback(() => {
@@ -137,22 +137,11 @@ export function MachineScreen({ id }: { id: string }) {
       )}
 
       <Card>
-        <h2 className="text-2xl font-bold">Recent pulls</h2>
-        <ul className="mt-3 flex flex-col divide-y divide-lilac">
-          {(pulls.data ?? []).slice(0, 12).map((p) => (
-            <li key={p.pull_id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2 text-sm">
-              <TierDot tier={p.tier} />
-              <span className="font-bold">{p.tier}</span>
-              <span className="tabular-nums">{fmtMultiplier(p.multiplier_bps)}</span>
-              <span className="text-plum">{shortAccount(p.buyer)}</span>
-              <span className="ml-auto tabular-nums">{fmtTokens(p.payout)} tokens</span>
-              <a className="text-xs font-semibold text-grape underline" href={`${EXPLORER_URL}/blocks/${p.block}`} target="_blank" rel="noreferrer">
-                block {p.block}
-              </a>
-            </li>
-          ))}
-          {pulls.data?.length === 0 && <li className="py-2">No pulls yet.</li>}
-        </ul>
+        <h2 className="flex items-center gap-2 text-2xl font-bold">
+          Live pulls
+          <span className="inline-block h-2.5 w-2.5 animate-pulse rounded-full bg-good" aria-hidden />
+        </h2>
+        <PullFeed pulls={pulls.data} account={pull.account} />
       </Card>
     </div>
   );

@@ -4,18 +4,31 @@ import Link from 'next/link';
 import { useState } from 'react';
 
 import { art } from '@/art/manifest';
+import { DeedCard } from '@/components/deed-card';
 import { Button, Card, Stat } from '@/components/ui';
-import { NFT_ID, USDT_ID, accountUrl, txUrl } from '@/config';
+import { USDT_ID, accountUrl, txUrl } from '@/config';
 import { fmtNear, fmtTokens, fmtUsdt } from '@/lib/format';
 import { useView } from '@/lib/use-view';
 import { useGaballsActions } from '@/near/actions';
 import { factory, isCertificate, isMachineToken, machine, nft, usdt } from '@/near/contracts';
+import type { ExecutionOutcome } from '@/near/outcome';
 import { nearBalance } from '@/near/rpc';
 
 const HOUR_NS = 3600n * 1_000_000_000n;
 
+/** Final status is SuccessValue and the returned value isn't `false` (e.g. claim's callback reports a restore). */
+function succeeded(o: ExecutionOutcome): boolean {
+  const st = o.status as { SuccessValue?: string } | undefined;
+  if (!st || typeof st !== 'object' || !('SuccessValue' in st)) return false;
+  try {
+    return atob(st.SuccessValue ?? '') !== 'false';
+  } catch {
+    return true;
+  }
+}
+
 export default function MyStuff() {
-  const { account, faucet, claim } = useGaballsActions();
+  const { account, faucet, claim, sweepFees } = useGaballsActions();
   const [msg, setMsg] = useState<{ text: string; tx?: string; bad?: boolean } | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -33,7 +46,11 @@ export default function MyStuff() {
         machines.map(async (m) => ({ info: m, balance: await machine(m.account_id).balanceOf(account) })),
       );
       const deeds = await Promise.all(
-        tokens.filter(isMachineToken).map(async (t) => ({ token: t, fees: await nft.feeBalance(t.token_id) })),
+        tokens.filter(isMachineToken).map(async (t) => {
+          const machineId = t.token_id.replace(/^machine:/, '');
+          const [fees, view] = await Promise.all([nft.feeBalance(t.token_id), machine(machineId).get().catch(() => null)]);
+          return { token: t, fees, accrued: view ? view.fees.nft_accrued : null };
+        }),
       );
       const nowNs = BigInt(Date.now()) * 1_000_000n;
       return { near, usdtBal, faucetLast, nowNs, coins, deeds, certs: tokens.filter(isCertificate) };
@@ -42,14 +59,22 @@ export default function MyStuff() {
     8000,
   );
 
-  async function run(label: string, fn: () => Promise<{ transaction: { hash: string } }>) {
+  /** Runs a wallet action; true only if the transaction's final result is a success (and not a `false` return). */
+  async function run(label: string, fn: () => Promise<ExecutionOutcome>): Promise<boolean> {
     setBusy(true);
     setMsg(null);
     try {
       const out = await fn();
-      setMsg({ text: `${label}: done`, tx: out.transaction.hash });
+      const ok = succeeded(out);
+      setMsg(
+        ok
+          ? { text: `${label}: done`, tx: out.transaction.hash }
+          : { text: `${label} did not go through; nothing moved.`, tx: out.transaction.hash, bad: true },
+      );
+      return ok;
     } catch (e) {
       setMsg({ text: `${label} did not complete: ${e instanceof Error ? e.message : e}`, bad: true });
+      return false;
     } finally {
       setBusy(false);
       void balances.refresh();
@@ -105,26 +130,21 @@ export default function MyStuff() {
       <Card>
         <h2 className="text-2xl font-bold">Machine NFTs</h2>
         {d?.deeds.length ? (
-          <ul className="mt-3 grid gap-4 sm:grid-cols-2">
-            {d.deeds.map(({ token, fees }) => (
-              <li key={token.token_id} className="rounded-3xl bg-blush p-4 ring-4 ring-grape">
-                <p className="font-display text-xl font-bold text-grape">{token.metadata?.title ?? token.token_id}</p>
-                <dl className="mt-2">
-                  <Stat
-                    label="Unclaimed fees"
-                    value={fmtUsdt(fees)}
-                    source={{ contract: NFT_ID, method: 'get_fee_balance', args: { token_id: token.token_id } }}
-                    className="bg-white"
-                  />
-                </dl>
-                <Button className="mt-3 w-full" disabled={busy || fees === '0'} onClick={() => run('Claim', () => claim(token.token_id))}>
-                  Claim {fmtUsdt(fees)}
-                </Button>
-              </li>
+          <ul className="mt-3 grid gap-4 lg:grid-cols-2">
+            {d.deeds.map(({ token, fees, accrued }) => (
+              <DeedCard
+                key={token.token_id}
+                token={token}
+                feeBalance={fees}
+                accrued={accrued}
+                busy={busy}
+                onClaim={() => run('Claim', () => claim(token.token_id))}
+                onSweep={() => run('Collect fees', () => sweepFees(token.token_id.replace(/^machine:/, '')))}
+              />
             ))}
           </ul>
         ) : (
-          <p className="mt-2">You don&apos;t own a Machine NFT. Launch a machine to get one.</p>
+          <p className="mt-2">You don&apos;t own a Machine NFT yet. Launch a machine to get one.</p>
         )}
       </Card>
 
@@ -150,10 +170,12 @@ export default function MyStuff() {
         {d?.certs.length ? (
           <ul className="mt-3 grid gap-3 sm:grid-cols-2">
             {d.certs.map((c) => (
-              <li key={c.token_id} className="flex items-center gap-3 rounded-3xl bg-[#fffaf0] p-4 ring-4 ring-tier-mythic">
+              <li key={c.token_id} className="relative flex items-center gap-3 overflow-hidden rounded-3xl px-7 py-6">
+                {/* eslint-disable-next-line @next/next/no-img-element -- certificate frame art from the manifest */}
+                <img src={art.cards.certificate} alt="" className="absolute inset-0 h-full w-full object-fill" />
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={art.gumballs.Mythic} alt="" width={48} height={48} />
-                <div>
+                <img src={art.gumballs.Mythic} alt="" width={48} height={48} className="relative" />
+                <div className="relative">
                   <p className="font-display text-lg font-bold">{c.metadata?.title}</p>
                   <p className="text-sm">{c.metadata?.description}</p>
                 </div>
