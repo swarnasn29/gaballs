@@ -7,7 +7,9 @@ holds a transferable Machine Ownership NFT that accrues creator fees in its own 
 
 Built at NEAR HACKATHON 2026. Tracks: `memecoins` (primary), `nfts` (secondary).
 
-> Status: Phase 0 (economics simulation). Sections marked _TBD_ are filled in as each phase lands.
+> Status: contracts on testnet, frontend live (Phases 0–4). Sections marked _TBD_ are filled in as each phase lands.
+
+**Live app (testnet):** https://gaballs.vercel.app — connect a NEAR testnet wallet; get mock USDT on "My stuff".
 
 ## 1. What to check in 5 minutes (judge quick path)
 
@@ -68,6 +70,16 @@ dependencies build without installing NASM. The variable is target-specific and 
 2. `npm run dev` → http://localhost:3000 (connect a NEAR **testnet** wallet; get mock USDT on "My stuff").
 3. `npm run build` → also runs `scripts/check-no-dev-signer.mjs` →
    `check-no-dev-signer: OK — scanned N build files, no dev signer code`.
+
+Deployed with the Vercel CLI from `app/` (`vercel deploy --prod`). Vercel holds only the six public
+`NEXT_PUBLIC_*` contract ids from `.env.example`; `app/.vercelignore` keeps `.env*` from being uploaded. Check the live
+build: `curl -s -o /dev/null -w '%{http_code}' -X POST https://gaballs.vercel.app/api/dev-signer` → `404`.
+
+**Performance (Lighthouse 12.8 mobile, measured 2026-11-11).** Home, Launch and My stuff score 86–93 (median) on the
+live site. The machine page scores a median of ~71 in Lighthouse's default *simulated* mode and 83–94 with real
+(DevTools) 4× CPU throttling; layout shift is 0.001. The simulated gap comes from one ~0.4 s task that only appears
+while Lighthouse traces the page: the same page under Lighthouse's phone emulation in plain Chrome has no task over
+50 ms. On phones (small touch screens) the machine starts in 2D; "Switch to 3D" loads the 3D engine (~1 MB).
 
 Self-check scripts (`app/scripts/`): `screens.mjs` (390/1440 screenshots + styling checks), `machine-stills.mjs`
 (3D stills), `record-pull.mjs` (records a real testnet pull), `fps-check.mjs` (frame rate, desktop and throttled phone).

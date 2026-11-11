@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { startTransition, useCallback, useEffect, useRef, useState } from 'react';
 
 type ViewState<T> = { key: string; data?: T; error?: string };
 
@@ -15,10 +15,12 @@ export function useView<T>(load: () => Promise<T>, key: string, refreshMs = 0) {
   const refresh = useCallback(async () => {
     try {
       const data = await loadRef.current();
-      setState({ key, data });
+      // As a transition, the re-render when results arrive is split into small slices instead of one long blocking
+      // task (a plain setState after an await renders in one go; on the machine page that froze phones ~0.4-1.5 s).
+      startTransition(() => setState({ key, data }));
     } catch (e) {
       const error = e instanceof Error ? e.message : String(e);
-      setState((s) => ({ key, data: s.key === key ? s.data : undefined, error }));
+      startTransition(() => setState((s) => ({ key, data: s.key === key ? s.data : undefined, error })));
     }
   }, [key]);
 
