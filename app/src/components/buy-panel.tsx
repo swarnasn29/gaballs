@@ -4,6 +4,7 @@ import { txUrl } from '@/config';
 import { fmtMultiplier, fmtTokens } from '@/lib/format';
 import type { PullState } from '@/lib/use-pull';
 import { TierDot } from './machine-bits';
+import { PullProgress } from './pull-progress';
 import { Button, cx } from './ui';
 
 /**
@@ -57,9 +58,17 @@ export function BuyPanel({
       </fieldset>
 
       {timedOut ? (
-        <Button onClick={onRefund} disabled={state.refunding}>
-          {state.refunding ? 'Refunding…' : 'Get my USDT back'}
-        </Button>
+        <div className="flex flex-col gap-3 rounded-3xl bg-tier-mythic/20 p-4 ring-2 ring-warn" role="alert">
+          <p className="font-display text-lg font-semibold text-ink">No randomness proof arrived in time</p>
+          <p className="text-sm">
+            Nothing was bought and your USDT is still held by the machine. The 5-minute timeout has passed, so you can take
+            it back now: the contract refunds it in full.
+          </p>
+          <Button onClick={onRefund} disabled={state.refunding}>
+            {state.refunding ? 'Refunding…' : `Get my ${state.usdt ? `${Number(state.usdt) / 1e6} ` : ''}USDT back`}
+          </Button>
+          {state.error && <p className="text-sm font-semibold text-bad">{state.error}</p>}
+        </div>
       ) : finished ? (
         <Button variant="secondary" onClick={onReset}>
           Play again
@@ -69,10 +78,11 @@ export function BuyPanel({
           {pending ? 'Turning the crank…' : account ? `Open ${count} pack${count > 1 ? 's' : ''}` : 'Connect a wallet to play'}
         </Button>
       )}
-      {!finished && account && !pending && <p className="text-xs text-plum">Or drag the machine&apos;s crank a full turn.</p>}
+      {!finished && !timedOut && account && !pending && <p className="text-xs text-plum">Or drag the machine&apos;s crank a full turn.</p>}
 
       <div aria-live="polite" className="min-h-6 text-sm">
-        {pending && (
+        {pending && state.vrf && <PullProgress paidAt={state.paidAt} count={state.count} />}
+        {pending && !state.vrf && (
           <p>
             {state.vrf
               ? state.slow
@@ -83,17 +93,10 @@ export function BuyPanel({
                 : 'Waiting for the transaction. The result comes from the contract, not from the animation.'}
           </p>
         )}
-        {timedOut && (
-          <p className="font-semibold text-warn">
-            The randomness proof did not arrive in time, so nothing was bought. Your USDT is safe in the machine: take it
-            back with the button above.{' '}
-            {state.txHash && (
-              <a className="underline" href={txUrl(state.txHash)} target="_blank" rel="noreferrer">
-                View transaction
-              </a>
-            )}
-            {state.error && <span className="block text-bad">{state.error}</span>}
-          </p>
+        {timedOut && state.txHash && (
+          <a className="font-semibold text-grape underline" href={txUrl(state.txHash)} target="_blank" rel="noreferrer">
+            View the payment transaction
+          </a>
         )}
         {state.phase === 'failed' && (
           <p className="font-semibold text-bad">

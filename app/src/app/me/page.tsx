@@ -5,10 +5,13 @@ import { useState } from 'react';
 
 import { art } from '@/art/manifest';
 import { DeedCard } from '@/components/deed-card';
+import { PullProgress } from '@/components/pull-progress';
+import { ReadyBadge } from '@/components/ready-card';
 import { SellPanel } from '@/components/sell-panel';
 import { Button, Card, Stat } from '@/components/ui';
 import { USDT_ID, accountUrl, txUrl } from '@/config';
 import { fmtNear, fmtTokens, fmtUsdt } from '@/lib/format';
+import { loadInbox } from '@/lib/pull-tracker';
 import { useView } from '@/lib/use-view';
 import { useGaballsActions } from '@/near/actions';
 import { factory, isCertificate, isMachineToken, machine, nft, usdt } from '@/near/contracts';
@@ -29,7 +32,7 @@ function succeeded(o: ExecutionOutcome): boolean {
 }
 
 export default function MyStuff() {
-  const { account, faucet, claim, sweepFees, sell } = useGaballsActions();
+  const { account, faucet, claim, sweepFees, sell, refundExpired } = useGaballsActions();
   const [selling, setSelling] = useState<string | null>(null);
   const [msg, setMsg] = useState<{ text: string; tx?: string; bad?: boolean } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -68,6 +71,26 @@ export default function MyStuff() {
     8000,
   );
 
+  // Pulls on VRF machines that are waiting for their proof, timed out, or settled and not opened yet.
+  const inboxes = useView(
+    async () => {
+      if (!account) return null;
+      const machines = await factory.getMachines();
+      const views = await Promise.all(machines.map((m) => machine(m.account_id).get().catch(() => null)));
+      const vrf = machines.filter((_, i) => views[i]?.config.vrf);
+      const now = Date.now();
+      const rows = await Promise.all(
+        vrf.map(async (info) => {
+          const inbox = await loadInbox(account, info.account_id);
+          return { info, inbox, paidAt: inbox.pending.map((p) => now - p.waitedSeconds * 1000) };
+        }),
+      );
+      return rows.filter((r) => r.inbox.pending.length > 0 || r.inbox.ready.length > 0);
+    },
+    `${account}:pulls`,
+    5000,
+  );
+
   /** Runs a wallet action; true only if the transaction's final result is a success (and not a `false` return). */
   async function run(label: string, fn: () => Promise<ExecutionOutcome>): Promise<boolean> {
     setBusy(true);
@@ -87,6 +110,7 @@ export default function MyStuff() {
     } finally {
       setBusy(false);
       void balances.refresh();
+      void inboxes.refresh();
     }
   }
 
@@ -135,6 +159,58 @@ export default function MyStuff() {
           )}
         </p>
       </Card>
+
+      {inboxes.data && inboxes.data.length > 0 && (
+        <Card>
+          <h2 className="text-2xl font-bold">Your pulls</h2>
+          <ul className="mt-3 flex flex-col divide-y divide-lilac">
+            {inboxes.data.flatMap(({ info, inbox, paidAt }) => [
+              ...inbox.ready.map((r) => (
+                <li key={`${info.account_id}:r${r.requestId}`} className="flex flex-wrap items-center gap-3 py-3">
+                  <span className="font-bold">${info.symbol}</span>
+                  <ReadyBadge />
+                  <span className="text-sm">
+                    {r.pulls.length} capsule{r.pulls.length > 1 ? 's' : ''}, verified
+                  </span>
+                  <Link
+                    href={`/machine/${info.account_id}`}
+                    className="ml-auto rounded-full bg-grape px-5 py-2 font-display text-base font-semibold text-white shadow-chunky-ink"
+                  >
+                    Open
+                  </Link>
+                </li>
+              )),
+              ...inbox.pending.map((p, i) => (
+                <li key={`${info.account_id}:p${p.request_id}`} className="flex flex-wrap items-center gap-3 py-3">
+                  <span className="font-bold">${info.symbol}</span>
+                  <span className="text-sm">
+                    {p.count} pack{p.count > 1 ? 's' : ''} · {fmtUsdt(p.usdt)} paid
+                  </span>
+                  {p.timedOut ? (
+                    <>
+                      <span className="text-sm font-semibold text-warn">No randomness proof in time — nothing was bought.</span>
+                      <Button
+                        className="ml-auto min-h-10 py-2 text-base"
+                        disabled={busy}
+                        onClick={() => run('Refund', () => refundExpired(info.account_id, p.request_id))}
+                      >
+                        Get my USDT back
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <PullProgress paidAt={paidAt[i]} compact />
+                      <Link className="ml-auto text-sm font-semibold text-grape underline" href={`/machine/${info.account_id}`}>
+                        Watch on the machine
+                      </Link>
+                    </>
+                  )}
+                </li>
+              )),
+            ])}
+          </ul>
+        </Card>
+      )}
 
       <Card>
         <h2 className="text-2xl font-bold">Machine NFTs</h2>

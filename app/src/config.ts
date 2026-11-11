@@ -15,3 +15,6 @@ export const USDT_ID = required('NEXT_PUBLIC_USDT_ID', process.env.NEXT_PUBLIC_U
 
 export const txUrl = (hash: string) => `${EXPLORER_URL}/txns/${hash}`;
 export const accountUrl = (id: string) => `${EXPLORER_URL}/address/${id}`;
+
+/** Listed first on the home page. */
+export const FEATURED_MACHINE = process.env.NEXT_PUBLIC_FEATURED_MACHINE ?? 'gumball.gaballs.testnet';

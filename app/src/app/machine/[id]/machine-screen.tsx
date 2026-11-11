@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { BuyPanel } from '@/components/buy-panel';
 import { MachineStage } from '@/components/machine/stage';
@@ -8,8 +8,10 @@ import { PullFeed } from '@/components/pull-feed';
 import { RevealDialog } from '@/components/reveal/reveal-dialog';
 import type { StagePhase } from '@/components/machine/shared';
 import { OddsTable, RandomnessBadge, RiskNotice, vaultHealth } from '@/components/machine-bits';
+import { ReadyCard } from '@/components/ready-card';
 import { Card, Stat } from '@/components/ui';
 import { fmtMultiplier, fmtPrice, fmtTokens, fmtUsdtCompact } from '@/lib/format';
+import { loadInbox, markOpened } from '@/lib/pull-tracker';
 import { usePull } from '@/lib/use-pull';
 import { useView } from '@/lib/use-view';
 import { machine } from '@/near/contracts';
@@ -29,6 +31,40 @@ export function MachineScreen({ id }: { id: string }) {
   const [count, setCount] = useState(1);
   const [capsuleOut, setCapsuleOut] = useState(false);
   const [revealOpen, setRevealOpen] = useState(false);
+
+  // This player's pulls on a VRF machine, read from the contract: waiting ones survive reloads, and ones that settled
+  // while away are "ready to open".
+  const isVrf = !!view.data?.config.vrf;
+  const account = pull.account;
+  const inbox = useView(
+    () => (account && isVrf ? loadInbox(account, id) : Promise.resolve(null)),
+    `${id}:${account}:${isVrf}`,
+    6000,
+  );
+  const resumed = useRef(false);
+  const { resume } = pull;
+  const idle = pull.state.phase === 'idle';
+  useEffect(() => {
+    const first = inbox.data?.pending[0];
+    if (!first || resumed.current || !idle) return;
+    resumed.current = true;
+    void resume(first);
+  }, [inbox.data, idle, resume]);
+  // Refunded while away: nothing to open; the USDT is back in the wallet.
+  useEffect(() => {
+    if (account && inbox.data?.refunded.length) markOpened(account, id, inbox.data.refunded);
+  }, [account, id, inbox.data]);
+  // Once the reveal plays, those requests are no longer "ready to open".
+  const shownPulls = pull.state.phase === 'opened' ? pull.state.pulls : null;
+  const refreshInbox = inbox.refresh;
+  useEffect(() => {
+    if (!revealOpen || !shownPulls || !account) return;
+    const ids = [...new Set(shownPulls.map((p) => p.request_id).filter((r): r is number => r !== undefined))];
+    if (ids.length) {
+      markOpened(account, id, ids);
+      void refreshInbox();
+    }
+  }, [account, id, revealOpen, shownPulls, refreshInbox]);
 
   const open = useCallback(() => {
     setCapsuleOut(false);
@@ -118,6 +154,16 @@ export function MachineScreen({ id }: { id: string }) {
         </div>
 
         <Card className="flex flex-col gap-4 self-start">
+          {idle && inbox.data?.ready[0] && (
+            <ReadyCard
+              ready={inbox.data.ready[0]}
+              more={inbox.data.ready.length - 1}
+              onOpen={() => {
+                setCapsuleOut(false);
+                pull.openSettled(inbox.data!.ready[0]);
+              }}
+            />
+          )}
           <BuyPanel
             account={pull.account}
             count={count}

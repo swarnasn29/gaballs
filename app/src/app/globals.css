@@ -93,3 +93,19 @@ h3,
   animation: sky-drift 30s ease-in-out infinite;
   will-change: transform;
 }
+
+/* Pending VRF pull: three gumballs breathing in turn (calm, ~1.4 s cycle) */
+@keyframes pull-orb {
+  0%,
+  100% {
+    transform: scale(0.7);
+    opacity: 0.55;
+  }
+  50% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+.pull-orb {
+  animation: pull-orb 1.4s ease-in-out infinite;
+}
