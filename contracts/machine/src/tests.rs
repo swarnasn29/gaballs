@@ -650,13 +650,17 @@ fn vrf_proof_for_another_request_or_a_tampered_alpha_is_rejected() {
         "vrf::buyer0.gaballs.testnet:s",
         "vrf:12x:buyer0.gaballs.testnet:s",
         "vr:1:buyer0.gaballs.testnet:s",
-        "vrf:1:someone.testnet:s",
+        "vrf:1::s",
+        "vrf:1:Not An Account:s",
         "vrf:1:buyer0.gaballs.testnet:s-extra",
+        "vrf:1:buyer0.gaballs.testnet:",
     ] {
-        assert!(!vrf::alpha_is_for(bad, &buyer(0), &machine_id(), "s"), "{bad}");
+        assert!(!vrf::alpha_is_for(bad, "s"), "{bad}");
     }
-    assert!(vrf::alpha_is_for("vrf:1:buyer0.gaballs.testnet:s", &buyer(0), &machine_id(), "s"));
-    assert!(vrf::alpha_is_for("vrf:1:gold.gaballs.testnet:s", &buyer(0), &machine_id(), "s"));
+    // Any valid signer is fine: the seed is what binds a proof to one pull.
+    for good in ["vrf:1:buyer0.gaballs.testnet:s", "vrf:1:gold.gaballs.testnet:s", "vrf:1:someone.testnet:s"] {
+        assert!(vrf::alpha_is_for(good, "s"), "{good}");
+    }
 }
 
 #[test]
@@ -931,4 +935,48 @@ fn walkthrough_one_sell() {
     println!("seller receives        : {} USDT", usdt_str(q.usdt_out.0));
     println!("price after            : {:.10} USDT/token", m.price() as f64 / 1e18);
     check_invariants(&m, 1);
+}
+
+// ------------------------------------------------------------------ Squads: the proof's signer is not the buyer
+
+#[test]
+fn vrf_proof_for_another_request_of_the_same_buyer_is_rejected() {
+    let mut m = launch_with_buyers(1);
+    let p0 = pending_after_payment(&mut m, &buyer(0), 1, 1);
+    let p1 = pending_after_payment(&mut m, &buyer(0), 1, 2);
+    // Genuine OutLayer signature, same buyer, same machine, but request 1's seed delivered as request 0's answer.
+    assert!(!deliver(&mut m, p0.request_id, PromiseResult::Successful(proof_for(&p1, &vrf_key())), 3));
+    assert!(logged("VRF proof is for a different request"));
+    assert_eq!(m.stats.packs_opened, 0);
+}
+
+#[test]
+fn vrf_proof_from_another_machine_is_rejected() {
+    let mut m = launch_with_buyers(1);
+    let p = pending_after_payment(&mut m, &buyer(0), 1, 1);
+    // Genuine OutLayer signature for the same request number on a different machine (its seed names that machine).
+    let alpha = format!("vrf:50000:{}:other.gaballs.testnet-{}", p.buyer, p.request_id);
+    assert!(!deliver(&mut m, p.request_id, PromiseResult::Successful(proof_with_alpha(&alpha, &vrf_key())), 2));
+    assert!(logged("VRF proof is for a different request"));
+    assert_eq!(m.stats.packs_opened, 0);
+}
+
+#[test]
+fn vrf_proof_naming_a_different_signer_with_the_right_seed_is_accepted_and_pays_the_buyer() {
+    // A Sputnik DAO pays (sender_id = the DAO), but the transaction that executes the proposal is signed by the member
+    // who cast the deciding vote, and OutLayer puts that signer in the alpha.
+    ctx(acc("gaballs.testnet"), 0);
+    let mut m = Machine::new(default_args());
+    let dao = acc("squad.sputnikv2.testnet");
+    m.token.internal_register_account(&dao);
+    let p = pending_after_payment(&mut m, &dao, 2, 1);
+    let alpha = format!("vrf:50000:buyer2.gaballs.testnet:{}", p.seed);
+    assert!(deliver(&mut m, p.request_id, PromiseResult::Successful(proof_with_alpha(&alpha, &vrf_key())), 2));
+    assert_eq!(m.stats.packs_opened, 2);
+    let paid: u128 = m.get_recent_pulls().iter().map(|r| r.payout.0).sum();
+    assert_eq!(bal(&m, &dao), paid, "the prize goes to the buyer (the DAO), not to the signer");
+    assert_eq!(bal(&m, &acc("buyer2.gaballs.testnet")), 0);
+    assert!(m.get_recent_pulls().iter().all(|r| r.buyer == dao && r.vrf_alpha == alpha));
+    // Supply invariant with the DAO as the only holder besides the creator (check_invariants only knows buyer(i)).
+    assert_eq!(m.curve_tokens + m.vault + bal(&m, &creator()) + bal(&m, &dao), TOTAL_SUPPLY);
 }

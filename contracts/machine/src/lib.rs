@@ -471,9 +471,8 @@ impl Machine {
             return false;
         };
         self.pending_usdt -= pending.usdt.0;
-        let machine = env::current_account_id();
         let checked = match env::promise_result_checked(0, MAX_VRF_RESULT_BYTES) {
-            Ok(raw) => vrf::verify(&raw, &self.vrf_pubkey, &pending.buyer, &machine, &pending.seed),
+            Ok(raw) => vrf::verify(&raw, &self.vrf_pubkey, &pending.seed),
             Err(_) => Err("OutLayer VRF request failed".to_string()),
         };
         let proof = match checked {

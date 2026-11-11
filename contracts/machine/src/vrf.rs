@@ -4,8 +4,10 @@
 //! `alpha = "vrf:{request_id}:{sender_id}:{seed}"` with the VRF key (Ed25519) and returns the alpha and signature.
 //! The callback trusts nothing it is told except what it can check here:
 //!   1. the signature is a valid Ed25519 signature over `alpha` by the VRF public key fixed at launch;
-//!   2. `alpha` is for THIS pull: it ends in this machine's unique seed for the request and names the buyer
-//!      (or the machine) as sender, so a valid proof from another request cannot be swapped in;
+//!   2. `alpha` is for THIS pull: it ends in this machine's unique seed for the request (`{machine}-{request_id}`), so
+//!      a valid proof from another request or another machine cannot be swapped in. The `sender` part of the alpha is
+//!      whoever signed the transaction (OutLayer's rule); it is not checked, because a buyer that cannot sign (a
+//!      Sputnik DAO squad) pays through a member's vote, and the seed alone already pins the proof to one pull;
 //!   3. the rolls come from SHA-256 of the signature, computed here. OutLayer's own `value` field is ignored.
 
 use near_sdk::serde::Deserialize;
@@ -40,11 +42,11 @@ pub fn seed_for(machine: &AccountId, request_id: u64) -> String {
 }
 
 /// Parses OutLayer's JSON result and verifies the first entry. `Err` carries a short reason for the refund event.
-pub fn verify(raw: &[u8], pubkey: &[u8; 32], buyer: &AccountId, machine: &AccountId, seed: &str) -> Result<Proof, String> {
+pub fn verify(raw: &[u8], pubkey: &[u8; 32], seed: &str) -> Result<Proof, String> {
     let response: VrfResponse =
         near_sdk::serde_json::from_slice(raw).map_err(|_| "VRF result is not valid JSON".to_string())?;
     let entry = response.results.into_iter().next().ok_or("VRF result has no entries")?;
-    if !alpha_is_for(&entry.alpha, buyer, machine, seed) {
+    if !alpha_is_for(&entry.alpha, seed) {
         return Err("VRF proof is for a different request".to_string());
     }
     let signature: [u8; 64] = from_hex(&entry.signature_hex)
@@ -56,16 +58,17 @@ pub fn verify(raw: &[u8], pubkey: &[u8; 32], buyer: &AccountId, machine: &Accoun
     Ok(Proof { alpha: entry.alpha, signature })
 }
 
-/// `vrf:{digits}:{buyer or machine}:{seed}`, exactly.
-pub fn alpha_is_for(alpha: &str, buyer: &AccountId, machine: &AccountId, seed: &str) -> bool {
+/// `vrf:{digits}:{signer}:{seed}`, exactly: OutLayer's request id, the account that signed the transaction (any valid
+/// account id), and this pull's seed.
+pub fn alpha_is_for(alpha: &str, seed: &str) -> bool {
     let Some(rest) = alpha.strip_prefix("vrf:") else { return false };
     let mut parts = rest.splitn(3, ':');
-    let (Some(request_id), Some(sender), Some(user_seed)) = (parts.next(), parts.next(), parts.next()) else {
+    let (Some(request_id), Some(signer), Some(user_seed)) = (parts.next(), parts.next(), parts.next()) else {
         return false;
     };
     !request_id.is_empty()
         && request_id.bytes().all(|b| b.is_ascii_digit())
-        && (sender == buyer.as_str() || sender == machine.as_str())
+        && signer.parse::<AccountId>().is_ok()
         && user_seed == seed
 }
 

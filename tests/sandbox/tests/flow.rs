@@ -7,7 +7,8 @@
 //! Phase 5: VRF proofs settle packs on-chain (valid / forged / failed / timeout refund) and sell-back pays out.
 //!
 //! OutLayer is played by `contracts/mock-outlayer`: each test signs the VRF response with its own test key (which
-//! the factory hands to every machine as its VRF public key) and queues it before paying for a pack.
+//! the factory hands to every machine as its VRF public key) and registers it for the next request's seed before
+//! paying for a pack.
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -121,20 +122,23 @@ impl Env {
         self.ok(who, &self.usdt, "storage_deposit", json!({ "account_id": who }), NearToken::from_millinear(10)).await;
     }
 
-    /// Queues the mock OutLayer's answer for `machine`'s next VRF request (made by `buyer`).
-    async fn queue_vrf(&self, machine: &AccountId, buyer: &AccountId, vrf: Vrf<'_>) {
+    /// Queues the mock OutLayer's answer for `machine`'s next VRF request. `signer` is who signs the transaction that
+    /// pays (OutLayer names the transaction signer in the alpha): the buyer, or the member whose vote executes a DAO
+    /// proposal.
+    async fn queue_vrf(&self, machine: &AccountId, signer: &AccountId, vrf: Vrf<'_>) {
         let m: Value = self.view(machine, "get_machine", json!({})).await;
         let request_id = m["request_nonce"].as_u64().unwrap();
         let response = match vrf {
             Vrf::Fail => None,
             Vrf::Valid | Vrf::SignedBy(_) => {
                 let key = if let Vrf::SignedBy(k) = vrf { k.clone() } else { vrf_key() };
-                let alpha = format!("vrf:{}:{buyer}:{machine}-{request_id}", 70_000 + request_id);
+                let alpha = format!("vrf:{}:{signer}:{machine}-{request_id}", 70_000 + request_id);
                 let sig = key.sign(alpha.as_bytes()).to_bytes();
                 Some(json!({ "results": [{ "alpha": alpha, "signature_hex": hex(&sig), "value": 0 }] }).to_string())
             }
         };
-        self.ok(&self.outlayer, &self.outlayer, "push_response", json!({ "response": response }), NearToken::from_near(0))
+        let seed = format!("{machine}-{request_id}");
+        self.ok(&self.outlayer, &self.outlayer, "push_response", json!({ "seed": seed, "response": response }), NearToken::from_near(0))
             .await;
     }
 
@@ -537,4 +541,229 @@ async fn longest_symbol_launch_mints_the_machine_nft() -> TestResult {
     assert_eq!(info["usdt_registered"], true);
     println!("12-character symbol launched with cost {cost}: nft_minted, usdt_registered");
     Ok(())
+}
+
+// ------------------------------------------------------------------ Squads: a real Sputnik DAO buys packs
+
+/// The Sputnik DAO v2 contract testnet's factory deploys by default (sputnikv2.testnet `get_default_code_hash` =
+/// AA4nA45vauiac3jdVwJTzSdUP3oj2r1fDaPAb2mHdgcH, version 3.31, commit 7764926). Fetched with `get_code`; see
+/// tests/sandbox/res/README.md.
+fn sputnik_wasm() -> Vec<u8> {
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("res/sputnikdao2-v3.31.wasm");
+    std::fs::read(&path).unwrap_or_else(|e| panic!("{}: {e}", path.display()))
+}
+
+fn b64(v: &Value) -> String {
+    use base64::Engine;
+    base64::engine::general_purpose::STANDARD.encode(v.to_string())
+}
+
+/// One FunctionCall action for a Sputnik proposal.
+fn action(method: &str, args: Value, deposit: u128, tgas: u64) -> Value {
+    json!({ "method_name": method, "args": b64(&args), "deposit": deposit.to_string(), "gas": (tgas * 1_000_000_000_000).to_string() })
+}
+
+const BOND: NearToken = NearToken::from_millinear(100);
+
+impl Env {
+    /// `who` proposes a FunctionCall on `receiver`; returns the proposal id.
+    async fn propose(&self, dao: &AccountId, who: &AccountId, description: &str, receiver: &AccountId, actions: Vec<Value>) -> u64 {
+        let kind = json!({ "FunctionCall": { "receiver_id": receiver, "actions": actions } });
+        let r = self.call(who, dao, "add_proposal", json!({ "proposal": { "description": description, "kind": kind } }), BOND).await;
+        assert!(r.clone().into_result().is_ok(), "add_proposal failed: {:?}", r.into_result().err());
+        let last: u64 = self.view(dao, "get_last_proposal_id", json!({})).await;
+        last - 1
+    }
+
+    async fn vote(&self, dao: &AccountId, who: &AccountId, id: u64) -> ExecutionFinalResult {
+        self.call(who, dao, "act_proposal", json!({ "id": id, "action": "VoteApprove" }), NearToken::from_near(0)).await
+    }
+
+    async fn status(&self, dao: &AccountId, id: u64) -> String {
+        let p: Value = self.view(dao, "get_proposal", json!({ "id": id })).await;
+        p["status"].as_str().unwrap_or("?").to_string()
+    }
+
+    async fn token_balance(&self, token: &AccountId, who: &AccountId) -> u128 {
+        let v: String = self.view(token, "ft_balance_of", json!({ "account_id": who })).await;
+        v.parse().unwrap()
+    }
+}
+
+#[tokio::test]
+async fn sputnik_dao_squad_opens_packs_by_vote_and_receives_the_prize() -> TestResult {
+    // test-hooks machine only to force one Mythic (certificate to the DAO); the VRF path is the production one.
+    let env = setup(wasm("machine_test_hooks/gaballs_machine.wasm")).await?;
+    let machine = env.launch().await;
+    let (a, b, c) = (env.creator.clone(), env.buyer.clone(), env.new_owner.clone());
+
+    // 1. The squad: a real Sputnik DAO, council a/b/c, 2 of 3 approvals, 0.1 NEAR proposal bond, council-only proposals.
+    let dao = id("squad.sandbox");
+    env._sandbox.create_account(dao.as_str().parse()?).initial_balance(NearToken::from_near(10)).send().await?;
+    let policy = json!({
+        "roles": [{
+            "name": "council",
+            "kind": { "Group": [a, b, c] },
+            "permissions": ["*:AddProposal", "*:VoteApprove", "*:VoteReject", "*:VoteRemove", "*:Finalize"],
+            "vote_policy": {}
+        }],
+        "default_vote_policy": { "weight_kind": "RoleWeight", "quorum": "0", "threshold": "2" },
+        "proposal_bond": BOND.as_yoctonear().to_string(),
+        "proposal_period": "604800000000000",
+        "bounty_bond": BOND.as_yoctonear().to_string(),
+        "bounty_forgiveness_period": "86400000000000"
+    });
+    near_api::Contract::deploy(dao.clone())
+        .use_code(sputnik_wasm())
+        .with_init_call("new", json!({ "config": { "name": "gaballs-squad", "purpose": "Group gacha", "metadata": "" }, "policy": policy }))?
+        .with_signer(env.signer.clone())
+        .send_to(&env.net)
+        .await?
+        .assert_success();
+    let pol: Value = env.view(&dao, "get_policy", json!({})).await;
+    assert_eq!(pol["default_vote_policy"]["threshold"], "2");
+    println!("1. DAO {dao}: council {a}, {b}, {c}; threshold 2 of 3; bond 0.1 NEAR");
+
+    // 2. Anyone pays the DAO's storage on USDT and on the machine token; members chip in USDT.
+    env.register_usdt(&dao).await;
+    env.ok(&b, &machine, "storage_deposit", json!({ "account_id": dao }), NearToken::from_millinear(10)).await;
+    for who in [&b, &c] {
+        env.ok(who, &env.usdt, "faucet", json!({}), NearToken::from_near(0)).await;
+        env.ok(who, &env.usdt, "ft_transfer", json!({ "receiver_id": dao, "amount": (100 * USDT).to_string() }), NearToken::from_yoctonear(1)).await;
+    }
+    assert_eq!(env.usdt_balance(&dao).await, 200 * USDT);
+    println!("2. members chipped in: DAO holds 200 USDT");
+
+    // 3. Gas search: the ft_transfer_call action needs enough gas for USDT -> machine -> VRF request (150 Tgas) and
+    //    its callback (60 Tgas), all inside the 300 Tgas vote transaction. One pack per try, cheapest first.
+    let pack_msg = json!({ "action": "open_pack", "count": 1 }).to_string();
+    let mut works = None;
+    for tgas in [200u64, 230, 245, 255, 265, 275] {
+        let before: Value = env.view(&machine, "get_machine", json!({})).await;
+        let id = env
+            .propose(&dao, &a, &format!("1 pack, {tgas} Tgas"), &env.usdt, vec![action(
+                "ft_transfer_call",
+                json!({ "receiver_id": machine, "amount": PACK.to_string(), "msg": pack_msg }),
+                1,
+                tgas,
+            )])
+            .await;
+        env.vote(&dao, &b, id).await;
+        env.queue_vrf(&machine, &c, Vrf::Valid).await; // c casts the deciding vote, so c signs the paying transaction
+        let out = env.vote(&dao, &c, id).await;
+        let after: Value = env.view(&machine, "get_machine", json!({})).await;
+        let opened = after["stats"]["packs_opened"].as_u64().unwrap() - before["stats"]["packs_opened"].as_u64().unwrap();
+        println!(
+            "   {tgas} Tgas: vote tx {}, proposal {}, packs opened {opened}",
+            if out.clone().into_result().is_ok() { "ok" } else { "FAILED" },
+            env.status(&dao, id).await
+        );
+        if opened == 1 && works.is_none() {
+            works = Some(tgas);
+        }
+    }
+    let min_tgas = works.expect("no gas level opened a pack");
+    println!("3. smallest action gas that opens a VRF pack by DAO vote: {min_tgas} Tgas");
+
+    // 4. The real squad pull: 5 packs at the recommended gas, one forced Mythic so the certificate goes to the DAO.
+    let squad_tgas = 275;
+    let held_before = env.token_balance(&machine, &dao).await;
+    env.ok(&b, &machine, "test_force_next_tier", json!({ "tier": 3 }), NearToken::from_near(0)).await;
+    let id = env
+        .propose(&dao, &a, "Open 5 packs", &env.usdt, vec![action(
+            "ft_transfer_call",
+            json!({ "receiver_id": machine, "amount": (5 * PACK).to_string(), "msg": json!({ "action": "open_pack", "count": 5 }).to_string() }),
+            1,
+            squad_tgas,
+        )])
+        .await;
+    assert_eq!(env.status(&dao, id).await, "InProgress");
+    env.vote(&dao, &b, id).await;
+    assert_eq!(env.status(&dao, id).await, "InProgress", "one vote of two is not enough");
+    env.queue_vrf(&machine, &c, Vrf::Valid).await;
+    let out = env.vote(&dao, &c, id).await;
+    assert!(out.clone().into_result().is_ok(), "{:?}", out.into_result().err());
+    assert_eq!(env.status(&dao, id).await, "Approved");
+    let opened = events(&out, "pack_opened");
+    assert_eq!(opened.len(), 5, "the deciding vote's transaction settles all 5 packs");
+    assert!(opened.iter().all(|p| p["buyer"] == dao.as_str()));
+    assert!(opened[0]["vrf_alpha"].as_str().unwrap().contains(&format!(":{c}:{machine}-")), "alpha names the voter");
+    let payout: u128 = opened.iter().map(|p| p["payout"].as_str().unwrap().parse::<u128>().unwrap()).sum();
+    let held = env.token_balance(&machine, &dao).await;
+    assert_eq!(held - held_before, payout, "the prize landed in the DAO");
+    let tiers: Vec<&str> = opened.iter().map(|p| p["tier"].as_str().unwrap()).collect();
+    let cert_pull = opened.iter().find(|p| p["tier"] == "Mythic").expect("forced Mythic")["pull_id"].as_u64().unwrap();
+    let cert: Value = env.view(&env.nft, "nft_token", json!({ "token_id": format!("cert:{machine}:{cert_pull}") })).await;
+    assert_eq!(cert["owner_id"], dao.as_str(), "the Mythic certificate belongs to the squad");
+    println!("4. proposal {id}: 2 of 3 approved; 5 packs {tiers:?}; {payout} token units to the DAO; certificate cert:{machine}:{cert_pull} owned by the DAO");
+
+    // 5. Split part of the prize equally: one proposal on the machine token. Members may not be registered on the token yet,
+    //    so the batch first registers each one (storage_deposit, registration_only: paid by the DAO, refunded if
+    //    already registered), then makes the three transfers. One failed action would fail the whole batch.
+    let bounds: Value = env.view(&machine, "storage_balance_bounds", json!({})).await;
+    let min: u128 = bounds["min"].as_str().unwrap().parse()?;
+    let share = held / 5; // 20% each: 60% split, the other 40% is sold back to the curve in step 6
+    let before: Vec<u128> = futures_balances(&env, &machine, [&a, &b, &c]).await;
+    let mut transfers: Vec<Value> = [&a, &b, &c]
+        .iter()
+        .map(|m| action("storage_deposit", json!({ "account_id": m, "registration_only": true }), min, 10))
+        .collect();
+    transfers.extend(
+        [&a, &b, &c]
+            .iter()
+            .map(|m| action("ft_transfer", json!({ "receiver_id": m, "amount": share.to_string(), "memo": "squad split" }), 1, 15)),
+    );
+    let id = env.propose(&dao, &b, "Split the prize", &machine, transfers).await;
+    env.vote(&dao, &a, id).await;
+    let out = env.vote(&dao, &c, id).await;
+    let status = env.status(&dao, id).await;
+    assert_eq!(status, "Approved", "split proposal {status}: {:?}", out.into_result().err().map(|e| format!("{e:?}").chars().take(600).collect::<String>()));
+    let after: Vec<u128> = futures_balances(&env, &machine, [&a, &b, &c]).await;
+    for i in 0..3 {
+        assert_eq!(after[i] - before[i], share);
+    }
+    println!("5. proposal {id}: split {share} token units to each member");
+
+    // 6. Sell the rest of the treasury's tokens back: USDT returns to the DAO.
+    let left = env.token_balance(&machine, &dao).await;
+    let q: Value = env.view(&machine, "quote_sell", json!({ "amount": left.to_string() })).await;
+    let usdt_before = env.usdt_balance(&dao).await;
+    let id = env
+        .propose(&dao, &a, "Sell the rest back", &machine, vec![action(
+            "sell",
+            json!({ "amount": left.to_string(), "min_usdt_out": q["usdt_out"] }),
+            1,
+            100,
+        )])
+        .await;
+    env.vote(&dao, &b, id).await;
+    env.vote(&dao, &c, id).await;
+    let got = env.usdt_balance(&dao).await - usdt_before;
+    assert_eq!(got.to_string(), q["usdt_out"].as_str().unwrap());
+    println!("6. proposal {id}: sold {left} token units, {got} USDT units back in the treasury");
+
+    // 7. Co-own a machine: the creator gives the Machine NFT to the DAO; fees from a pull are swept and claimed by vote.
+    let token_id = format!("machine:{machine}");
+    env.ok(&a, &env.nft, "nft_transfer", json!({ "receiver_id": dao, "token_id": token_id }), NearToken::from_yoctonear(1)).await;
+    env.ok(&b, &machine, "sweep_fees", json!({}), NearToken::from_near(0)).await; // fees from all packs so far
+    let fees = env.fee_balance(&token_id).await;
+    assert!(fees > 0);
+    let usdt_before = env.usdt_balance(&dao).await;
+    let id = env
+        .propose(&dao, &c, "Claim machine fees", &env.nft, vec![action("claim", json!({ "token_id": token_id }), 1, 60)])
+        .await;
+    env.vote(&dao, &a, id).await;
+    env.vote(&dao, &b, id).await;
+    assert_eq!(env.usdt_balance(&dao).await - usdt_before, fees);
+    assert_eq!(env.fee_balance(&token_id).await, 0);
+    println!("7. proposal {id}: the DAO owns {token_id} and claimed {fees} USDT units of fees by vote");
+    Ok(())
+}
+
+async fn futures_balances(env: &Env, token: &AccountId, who: [&AccountId; 3]) -> Vec<u128> {
+    let mut out = vec![];
+    for w in who {
+        out.push(env.token_balance(token, w).await);
+    }
+    out
 }

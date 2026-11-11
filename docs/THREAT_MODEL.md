@@ -52,16 +52,29 @@ marked sandbox (`tests/sandbox/tests/flow.rs`, real contracts on a local node wi
 | # | Attack | What stops it | Test |
 | --- | --- | --- | --- |
 | V1 | **Forged proof.** Anyone (or a dishonest OutLayer worker) returns a made-up "random" result. | The callback runs `env::ed25519_verify` against the OutLayer VRF public key fixed at launch. Without OutLayer's key the signature cannot verify; the pull is refunded instead of settled. | `vrf_forged_proof_is_rejected_and_refunded`; sandbox `vrf_valid_forged_failed_and_timeout_on_chain` |
-| V2 | **Proof shopping.** A worker holds several genuine proofs and delivers the one with the best outcome for some request. | The alpha must end in *this* request's seed (`{machine}-{request_id}`, unique per machine and request) and name this buyer; a genuine proof for any other request is rejected. Each proof is deterministic (same key + alpha = same signature), so there is nothing to re-roll. | `vrf_proof_for_another_request_or_a_tampered_alpha_is_rejected` |
+| V2 | **Proof shopping.** A worker holds several genuine proofs and delivers the one with the best outcome for some request. | The alpha must end in *this* request's seed (`{machine}-{request_id}`, unique per machine and request); a genuine proof for any other request, or from another machine, is rejected. Each proof is deterministic (same key + alpha = same signature), so there is nothing to re-roll. | `vrf_proof_for_another_request_or_a_tampered_alpha_is_rejected`, `vrf_proof_for_another_request_of_the_same_buyer_is_rejected`, `vrf_proof_from_another_machine_is_rejected` |
 | V3 | **Fake "value".** OutLayer's response includes a convenient `value` field. | Ignored. The rolls are computed by the contract from SHA-256 of the verified signature. | `vrf_valid_proof_settles_with_rolls_derived_from_the_signature` |
 | V4 | **Duplicate or late callback** pays twice. | Settle and refund both start by removing the pending entry; whichever runs first wins, the other finds nothing and does nothing. `on_vrf_result` is `#[private]`. | `vrf_duplicate_callback_is_ignored`, `vrf_timeout_refund_by_anyone_and_late_result_is_ignored` |
 | V5 | **USDT stuck** because OutLayer never answers. | OutLayer failure → callback refunds. No callback at all → after 300 blocks anyone can call `refund_expired`. A refund whose transfer fails goes back to pending, flagged, and can be retried at once. | `vrf_garbage_or_failed_result_is_refunded`, `failed_refund_goes_back_to_pending_and_can_be_retried_at_once`; sandbox step 4 (301-block fast-forward) |
 | V6 | **Seeing the roll first.** The buyer (or a validator) predicts the outcome and only pays when it is good. | The roll depends on OutLayer's signature over a request id assigned by OutLayer after the payment is final; it cannot be computed before. (Block randomness in v1 machines could be influenced by block producers.) | by construction |
 | V7 | **Machine runs out of NEAR** for VRF fees and payments strand. | `ft_on_transfer` refunds immediately when the free balance is below 0.1 NEAR + 0.01 NEAR; anyone can top the machine up with a plain NEAR transfer. | `payment_is_refunded_when_the_machine_cannot_pay_for_vrf` |
+| V8 | **Squad pulls.** A Sputnik DAO (no keys) pays; the member whose vote executes the proposal signs the transaction, and OutLayer names that signer in the alpha. | The signer name is not checked (see below); the prize goes to the pending pull's recorded buyer (the DAO), never to the signer. | `vrf_proof_naming_a_different_signer_with_the_right_seed_is_accepted_and_pays_the_buyer`; sandbox `sputnik_dao_squad_opens_packs_by_vote_and_receives_the_prize` |
 | S1 | **Sell more USDT than the curve holds** (e.g. the creator dumps the 100M allocation at launch). | `quote_sell` rejects any sale whose `usdt_out` exceeds R. | `sell_that_would_push_the_reserve_below_zero_is_rejected` |
 | S2 | **Sandwich / price moves** between quote and sale. | `min_usdt_out`: the contract rejects the sale if it would pay less; the app sends quote − 1%. | `sell_slippage_guard`; sandbox `sell_back_on_chain` |
 | S3 | **USDT transfer fails** after the tokens were taken. | The callback returns the tokens and restores R and the fees (fees already swept away are not double-counted). | `failed_sell_transfer_restores_everything`, `failed_sell_after_a_sweep_restores_what_the_machine_still_holds` |
 | S4 | **Rounding drain** through many small sells. | Sell rounds in the contract's favour (the curve's remaining V+R is rounded up); the constant product never shrinks. | `curve_sell_matches_reference_and_rounds_for_the_contract` |
+
+**Why not checking the signer's name is safe.** OutLayer's alpha is `vrf:{request_id}:{signer}:{seed}`, where
+`signer` is whoever signed the transaction that paid. The first Phase 5 machine (`gumball`) also required `signer` to be
+the buyer or the machine; that made squad pulls impossible, because a Sputnik DAO has no keys and its proposals are
+executed by a member's vote. The current machine accepts any valid account there and keeps every other check: the
+signature must verify against the OutLayer key fixed at launch; the alpha must end in exactly this pending request's
+seed `{machine}-{request_id}`, which names this machine and is never reused; the request must still be pending (settled
+or refunded requests ignore late or duplicate answers); and the timeout refund is unchanged. The seed is what binds a
+proof to one pull: a proof for another request or another machine carries another seed and is rejected whoever signed
+it, and the signer cannot change who is paid, because the payout goes to the buyer recorded when the USDT arrived. The
+signer name added no protection the seed does not already give; it only tied a proof to the paying account's own
+signature, which a DAO can never produce.
 
 ## Residual risks (not solved by the contract — disclosed in the README)
 

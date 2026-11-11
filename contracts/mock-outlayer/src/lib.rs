@@ -1,19 +1,20 @@
 //! Stand-in for OutLayer's `request_execution`, used ONLY by the sandbox tests (tests/sandbox). Never deployed.
 //!
 //! The real OutLayer runs a VRF module and returns `{"results":[{"alpha","signature_hex",...}]}` signed by its VRF
-//! key. Here the test signs that response itself (with a test key the machine was launched with) and queues it with
-//! `push_response`; `request_execution` returns the next queued response, or fails if the queued entry is `null`.
+//! key. Here the test signs that response itself (with a test key the machine was launched with) and registers it with
+//! `push_response(seed, response)`; `request_execution` answers the request whose input carries that seed (the
+//! machine's unique `{machine}-{request_id}`), or fails if the registered response is `null`. Keyed by seed, so a
+//! request that never reaches OutLayer (e.g. it ran out of gas earlier) cannot shift the answers of later ones.
 
 use near_sdk::serde_json::Value;
-use near_sdk::store::Vector;
+use near_sdk::store::{LookupMap, Vector};
 use near_sdk::{AccountId, PanicOnDefault, env, near};
 
 #[near(contract_state)]
 #[derive(PanicOnDefault)]
 pub struct MockOutLayer {
-    /// Queued responses, served in order. `None` makes that request fail.
-    queue: Vector<Option<String>>,
-    next: u32,
+    /// Response per seed. `None` makes that request fail.
+    responses: LookupMap<String, Option<String>>,
     /// The `input_data` of every request, so tests can see the seeds the machine sent.
     inputs: Vector<String>,
 }
@@ -22,12 +23,12 @@ pub struct MockOutLayer {
 impl MockOutLayer {
     #[init]
     pub fn new() -> Self {
-        Self { queue: Vector::new(b"q"), next: 0, inputs: Vector::new(b"i") }
+        Self { responses: LookupMap::new(b"r"), inputs: Vector::new(b"i") }
     }
 
-    /// Queue the raw JSON for the next request, or `null` to make it fail.
-    pub fn push_response(&mut self, response: Option<String>) {
-        self.queue.push(response);
+    /// Register the raw JSON answer for the request with this `seed`, or `null` to make it fail.
+    pub fn push_response(&mut self, seed: String, response: Option<String>) {
+        self.responses.insert(seed, response);
     }
 
     /// Same signature as OutLayer's. Keeps the attached deposit (the real one refunds what it does not use).
@@ -42,9 +43,13 @@ impl MockOutLayer {
         payer_account_id: Option<AccountId>,
     ) -> Value {
         let _ = (source, resource_limits, secrets_ref, response_format, payer_account_id);
-        self.inputs.push(input_data.unwrap_or_default());
-        let entry = self.queue.get(self.next).cloned().unwrap_or_else(|| env::panic_str("no response queued"));
-        self.next += 1;
+        let input = input_data.unwrap_or_default();
+        self.inputs.push(input.clone());
+        let seed = near_sdk::serde_json::from_str::<Value>(&input)
+            .ok()
+            .and_then(|v| v["seed"].as_str().map(str::to_string))
+            .unwrap_or_else(|| env::panic_str("input has no seed"));
+        let entry = self.responses.remove(&seed).unwrap_or_else(|| env::panic_str("no response for this seed"));
         match entry {
             Some(json) => near_sdk::serde_json::from_str(&json).unwrap_or_else(|_| env::panic_str("queued response is not JSON")),
             None => env::panic_str("mock OutLayer: execution failed"),

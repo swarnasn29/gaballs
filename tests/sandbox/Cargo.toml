@@ -18,3 +18,5 @@ serde = "1"
 serde_json = "1"
 # Signs mock VRF proofs (stand-in for OutLayer's key).
 ed25519-dalek = "2.2"
+# Sputnik DAO proposals carry base64 call arguments.
+base64 = "0.22"
