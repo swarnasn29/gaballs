@@ -98,6 +98,13 @@ function crackle(start = 0, dur = 0.12, gain = 0.25) {
 }
 
 export const sfx = {
+  /** A machine was launched (confirmed on-chain). */
+  launched() {
+    if (!canPlay()) return;
+    [392, 523, 659, 784].forEach((f, i) => note(f, i * 0.09, 0.3, 'triangle', 0.12));
+    [784, 988, 1175].forEach((f) => note(f, 0.42, 0.9, 'sine', 0.08));
+    crackle(0.4, 0.2, 0.12);
+  },
   crack() {
     if (!canPlay()) return;
     crackle(0, 0.14, 0.3);

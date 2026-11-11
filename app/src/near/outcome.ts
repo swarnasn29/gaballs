@@ -60,3 +60,19 @@ export function readPackOutcome(outcome: ExecutionOutcome, buyer: string): PackR
   const failed = failureMessage(outcome.status) ?? outcome.receipts_outcome.map((r) => failureMessage(r.outcome.status)).find(Boolean);
   return { kind: 'failed', txHash, reason: failed ?? 'No pack_opened event in the transaction' };
 }
+
+export type LaunchResult = { kind: 'submitted'; txHash: string } | { kind: 'failed'; txHash?: string; reason: string };
+
+/**
+ * First look at a launch transaction. The factory logs "launch of X failed; refunding Y" if creating the machine
+ * failed (and refunds the deposit). "submitted" is NOT success yet: the UI then waits until get_machine() lists it.
+ */
+export function readLaunchOutcome(outcome: ExecutionOutcome): LaunchResult {
+  const txHash = outcome.transaction.hash;
+  const logs = outcome.receipts_outcome.flatMap((r) => r.outcome.logs);
+  const failedLog = logs.find((l) => /^launch of .* failed/.test(l));
+  if (failedLog) return { kind: 'failed', txHash, reason: failedLog };
+  const failed = failureMessage(outcome.status);
+  if (failed) return { kind: 'failed', txHash, reason: failed };
+  return { kind: 'submitted', txHash };
+}
