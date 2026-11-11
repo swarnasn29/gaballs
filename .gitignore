@@ -17,3 +17,6 @@ __pycache__/
 # os/editor
 .DS_Store
 Thumbs.db
+
+# script run logs (summarised into docs/DEPLOYMENTS.md)
+scripts/out/

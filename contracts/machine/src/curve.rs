@@ -33,6 +33,15 @@ pub fn price_wad(v: u128, r: u128, t: u128) -> u128 {
     if p > U256::from(u128::MAX) { u128::MAX } else { p.as_u128() }
 }
 
+/// `a * b / d` in 256 bits, rounded down (saturates at u128::MAX; 0 if d == 0).
+pub fn mul_div(a: u128, b: u128, d: u128) -> u128 {
+    if d == 0 {
+        return 0;
+    }
+    let r = U256::from(a) * U256::from(b) / U256::from(d);
+    if r > U256::from(u128::MAX) { u128::MAX } else { r.as_u128() }
+}
+
 /// `amount * bps / 10_000`, rounded down.
 pub fn bps_of(amount: u128, bps: u32) -> u128 {
     (U256::from(amount) * U256::from(bps) / U256::from(10_000u32)).as_u128()

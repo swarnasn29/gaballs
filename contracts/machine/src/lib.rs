@@ -133,6 +133,9 @@ pub struct Stats {
     pub total_usdt_in: U128,
     pub total_bought: U128,
     pub total_payout: U128,
+    /// Highest multiplier actually paid (payout / bought, in bps, after any vault cap). 0 before the first pull.
+    pub best_multiplier_bps: u32,
+    pub best_pull_id: Option<u64>,
 }
 
 /// One pull, as stored in the recent-pulls ring buffer and emitted in `pack_opened`.
@@ -376,6 +379,11 @@ impl Machine {
             curve_tokens: U128(self.curve_tokens),
             vault: U128(self.vault),
             price_usdt_wad: U128(self.price()),
+            market_cap_usdt: U128(self.value_in_usdt(TOTAL_SUPPLY)),
+            circulating_supply: U128(self.circulating_supply()),
+            circulating_market_cap_usdt: U128(self.value_in_usdt(self.circulating_supply())),
+            packs_opened: self.stats.packs_opened,
+            best_multiplier_bps: self.stats.best_multiplier_bps,
             total_supply: U128(self.token.total_supply),
             fees: self.fees.clone(),
             stats: self.stats.clone(),
@@ -431,6 +439,15 @@ pub struct MachineView {
     pub vault: U128,
     /// USDT per whole token, scaled by 10^18.
     pub price_usdt_wad: U128,
+    /// price x total supply (1B), in USDT units (6 decimals).
+    pub market_cap_usdt: U128,
+    /// Tokens outside the curve and the vault (held by the creator and buyers).
+    pub circulating_supply: U128,
+    /// price x circulating supply, in USDT units (6 decimals).
+    pub circulating_market_cap_usdt: U128,
+    pub packs_opened: u64,
+    /// Highest multiplier actually paid so far, in bps (80,000 = 8x).
+    pub best_multiplier_bps: u32,
     pub total_supply: U128,
     pub fees: Fees,
     pub stats: Stats,
@@ -459,6 +476,15 @@ pub struct PackQuote {
 impl Machine {
     fn price(&self) -> u128 {
         curve::price_wad(self.config.virtual_usdt_reserve.0, self.curve_usdt, self.curve_tokens)
+    }
+
+    /// `tokens` valued at the current spot price, in USDT units (6 decimals): tokens * (V + R) / T.
+    fn value_in_usdt(&self, tokens: u128) -> u128 {
+        curve::mul_div(tokens, self.config.virtual_usdt_reserve.0 + self.curve_usdt, self.curve_tokens)
+    }
+
+    fn circulating_supply(&self) -> u128 {
+        TOTAL_SUPPLY - self.curve_tokens - self.vault
     }
 
     /// (nft fee, platform fee, USDT into the curve) for one pack. Fees round down.
@@ -588,6 +614,11 @@ impl Machine {
         self.stats.total_usdt_in = U128(self.stats.total_usdt_in.0 + self.config.pack_price.0);
         self.stats.total_bought = U128(self.stats.total_bought.0 + bought);
         self.stats.total_payout = U128(self.stats.total_payout.0 + payout);
+        let effective_bps = curve::mul_div(payout, u128::from(odds::BPS), bought) as u32;
+        if self.stats.best_pull_id.is_none() || effective_bps > self.stats.best_multiplier_bps {
+            self.stats.best_multiplier_bps = effective_bps;
+            self.stats.best_pull_id = Some(pull_id);
+        }
 
         let record = PullRecord {
             pull_id,

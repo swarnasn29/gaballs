@@ -438,3 +438,46 @@ fn walkthrough_first_pull() {
     assert_eq!(bal(&m, &buyer(0)), p.payout.0);
     check_invariants(&m, 1);
 }
+
+// ------------------------------------------------------------------ machine card fields (frontend)
+
+#[test]
+fn machine_card_fields_at_launch() {
+    let m = launch_with_buyers(0).get_machine();
+    // 3,000 USDT / 800M tokens = 0.00000375 USDT; x 1B = 3,750 USDT.
+    assert_eq!(m.market_cap_usdt.0, 3_750 * USDT);
+    // Only the creator's 100M circulate at launch: 375 USDT.
+    assert_eq!(m.circulating_supply.0, 100_000_000 * ONE_TOKEN);
+    assert_eq!(m.circulating_market_cap_usdt.0, 375 * USDT);
+    assert_eq!(m.packs_opened, 0);
+    assert_eq!(m.best_multiplier_bps, 0);
+    assert_eq!(m.vault.0, 100_000_000 * ONE_TOKEN);
+    assert_eq!(m.price_usdt_wad.0, 3_750_000_000_000);
+}
+
+#[test]
+fn machine_card_fields_track_pulls() {
+    let mut m = launch_with_buyers(1);
+    pay(&mut m, &buyer(0), PACK * 5, &pack_msg(5), 1);
+    let v = m.get_machine();
+    assert_eq!(v.packs_opened, 5);
+    assert!(v.market_cap_usdt.0 > 3_750 * USDT, "price went up");
+    assert_eq!(v.circulating_supply.0, 100_000_000 * ONE_TOKEN + bal(&m, &buyer(0)));
+    let best = m.get_recent_pulls().iter().map(|p| p.payout.0 * 10_000 / p.bought.0).max().unwrap();
+    assert_eq!(u128::from(v.best_multiplier_bps), best);
+}
+
+#[test]
+fn best_multiplier_is_the_effective_one_after_the_cap() {
+    let mut m = launch_with_buyers(1);
+    for i in 0..3u64 {
+        ctx(usdt(), i);
+        m.pull_nonce = i + 1;
+        m.settle_pack(&buyer(0), i, 9_999, odds::MYTHIC, [0; 32]);
+    }
+    // First Mythic is uncapped (8x); the 3rd is capped, so the best stays 8x from pull 0.
+    let v = m.get_machine();
+    assert_eq!(v.best_multiplier_bps, 80_000);
+    assert_eq!(m.stats.best_pull_id, Some(0));
+    assert!(m.get_recent_pulls()[0].capped);
+}
