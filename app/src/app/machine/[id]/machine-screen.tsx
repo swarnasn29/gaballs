@@ -4,6 +4,7 @@ import { useCallback, useState } from 'react';
 
 import { BuyPanel } from '@/components/buy-panel';
 import { MachineStage } from '@/components/machine/stage';
+import { RevealDialog } from '@/components/reveal/reveal-dialog';
 import type { StagePhase } from '@/components/machine/shared';
 import { OddsTable, RiskNotice, TierDot, vaultHealth } from '@/components/machine-bits';
 import { Card, Stat } from '@/components/ui';
@@ -27,6 +28,7 @@ export function MachineScreen({ id }: { id: string }) {
   const pull = usePull(id, refreshAll);
   const [count, setCount] = useState(1);
   const [capsuleOut, setCapsuleOut] = useState(false);
+  const [revealOpen, setRevealOpen] = useState(false);
 
   const open = useCallback(() => {
     setCapsuleOut(false);
@@ -34,9 +36,15 @@ export function MachineScreen({ id }: { id: string }) {
   }, [pull, count]);
   const reset = useCallback(() => {
     setCapsuleOut(false);
+    setRevealOpen(false);
     pull.reset();
   }, [pull]);
-  const onCapsulesOut = useCallback(() => setCapsuleOut(true), []);
+  // The capsule has rolled out (only ever after the contract answered): open the reveal pop-up.
+  const onCapsulesOut = useCallback(() => {
+    setCapsuleOut(true);
+    setRevealOpen(true);
+  }, []);
+  const closeReveal = useCallback(() => setRevealOpen(false), []);
 
   if (view.error) return <Card>Could not load {id}: {view.error}</Card>;
   const v = view.data;
@@ -117,6 +125,16 @@ export function MachineScreen({ id }: { id: string }) {
           <RiskNotice />
         </Card>
       </div>
+
+      {revealOpen && pull.state.phase === 'opened' && (
+        <RevealDialog
+          pulls={pull.state.pulls}
+          txHash={pull.state.txHash}
+          machineId={id}
+          symbol={meta.data?.symbol ?? ''}
+          onClose={closeReveal}
+        />
+      )}
 
       <Card>
         <h2 className="text-2xl font-bold">Recent pulls</h2>

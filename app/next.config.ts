@@ -8,7 +8,11 @@ const root = path.resolve(__dirname);
 // DEV TEST SIGNER (src/app/api/dev-signer/route.dev.ts, src/dev/*): only when running `next dev` with DEV_SIGNER=1.
 // Files ending in .dev.ts/.dev.tsx are routes/pages ONLY in that mode, so production builds never compile them.
 // scripts/check-no-dev-signer.mjs runs after every `next build` (including Vercel) and fails if any trace remains.
-const devSigner = process.env.NODE_ENV === "development" && process.env.DEV_SIGNER === "1";
+// It also requires the dev server to be bound to 127.0.0.1 (`npm run dev:signer`), so a plain `npm run dev` — which
+// listens on the whole network — never enables it, even if DEV_SIGNER=1 is set in .env.local.
+const hostArg = process.argv[process.argv.indexOf("-H") + 1] ?? process.argv[process.argv.indexOf("--hostname") + 1];
+const localOnly = process.argv.includes("-H") || process.argv.includes("--hostname") ? hostArg === "127.0.0.1" : false;
+const devSigner = process.env.NODE_ENV === "development" && process.env.DEV_SIGNER === "1" && localOnly;
 
 const nextConfig: NextConfig = {
   cacheComponents: true,
@@ -16,7 +20,13 @@ const nextConfig: NextConfig = {
   // The dev-mode "N" badge covers content in screenshots.
   devIndicators: false,
   outputFileTracingRoot: root,
-  pageExtensions: devSigner ? ["dev.tsx", "dev.ts", "tsx", "ts"] : ["tsx", "ts"],
+  // *.preview.tsx pages (fake-data visual previews, e.g. /dev/reveal) exist in any `next dev`, never in builds.
+  pageExtensions: [
+    ...(devSigner ? ["dev.tsx", "dev.ts"] : []),
+    ...(process.env.NODE_ENV === "development" ? ["preview.tsx"] : []),
+    "tsx",
+    "ts",
+  ],
   env: { NEXT_PUBLIC_DEV_SIGNER: devSigner ? "1" : "0" },
   turbopack: {
     root,

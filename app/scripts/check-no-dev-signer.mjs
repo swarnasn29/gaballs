@@ -4,7 +4,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
 // Strings that exist only in the real dev signer code (route.dev.ts, dev-signer-client.dev.tsx), never in the stub.
-const MARKERS = ['/api/dev-signer', 'near-credentials', 'DEV SIGNER', 'local testing only', 'dev-signer-client'];
+const MARKERS = ['/api/dev-signer', 'near-credentials', 'DEV SIGNER', 'local testing only', 'dev-signer-client', 'fake data, not a real pull'];
 // CHECK_DIR lets you point the scan at `next dev` output to prove the markers are detected.
 const OUT = process.env.CHECK_DIR ?? '.next';
 const SKIP_DIRS = process.env.CHECK_DIR ? new Set() : new Set(['cache', 'dev']); // not deployed
