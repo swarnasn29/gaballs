@@ -1,0 +1,63 @@
+@import "tailwindcss";
+
+/* Gaballs theme. Text that carries numbers, odds or the risk notice always sits on a solid card (bg-card),
+   never directly on the sky. ink on white = 15.6:1, grape on white = 8.4:1, white on grape = 8.4:1 (WCAG AA+). */
+@theme {
+  --color-grape: #563791;
+  --color-plum: #6e4386;
+  --color-lavender: #b593c7;
+  --color-lilac: #d5b8e3;
+  --color-blush: #fee7fa;
+  --color-ink: #2b1840;
+  --color-card: #ffffff;
+
+  --color-tier-common: #b593c7;
+  --color-tier-rare: #5fb8ec;
+  --color-tier-epic: #f17cc3;
+  --color-tier-mythic: #ffc93c;
+
+  --color-good: #1d7a4f;
+  --color-warn: #8a5a00;
+  --color-bad: #b42346;
+
+  --font-display: var(--font-fredoka), ui-rounded, "Arial Rounded MT Bold", system-ui, sans-serif;
+  --font-body: var(--font-nunito), system-ui, sans-serif;
+
+  --shadow-chunky: 0 6px 0 0 var(--color-plum);
+  --shadow-chunky-ink: 0 6px 0 0 var(--color-ink);
+}
+
+html {
+  color-scheme: light;
+}
+
+body {
+  background: var(--color-lavender);
+  color: var(--color-ink);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+.font-display {
+  font-family: var(--font-display);
+  letter-spacing: 0.01em;
+}
+
+:focus-visible {
+  outline: 3px solid var(--color-grape);
+  outline-offset: 3px;
+  border-radius: 12px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
