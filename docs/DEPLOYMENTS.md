@@ -28,6 +28,32 @@ Manual top-up 0.4 NEAR [BQmJWCrK…](https://testnet.nearblocks.io/txns/BQmJWCrK
 then pack [GohpAdX9…](https://testnet.nearblocks.io/txns/GohpAdX9yPaLABcGULhysGGRJgY9xMKU7SVTZCaNwP1Q) → pull #37,
 Common, VRF request #9.
 
+## MetaMask / Ethereum wallet (near-connect "Ethereum Wallets", evm-on-near.dev), 2026-11-12 UTC
+
+Frontend only (commit 2571e94); no contract changed. Played on https://gaballs.vercel.app in Chrome with a throwaway
+MetaMask account. Player account `0xd4513c89ebf7c665d972960730422d6a54f372eb` (an Ethereum-style NEAR account: the
+0x address itself). One MetaMask approval per transaction; Gaballs never sees a key.
+
+Two fixes were needed in the app, both found in evm-on-near.dev's own code: (1) its wallet picker (Reown AppKit) asks
+MetaMask to switch to chain 398 and gives up with "Connection declined" if MetaMask doesn't know the chain, so the
+connect dialog now adds "NEAR Protocol Testnet" first ("Step 1 of 2"); (2) it refuses any action above 270 Tgas
+("Amount exceeds protocol limit"), so transactions sent through this wallet are capped at 270 Tgas (squad packs
+already use 270 Tgas, see below).
+
+| Step | Signed by | Tx |
+| --- | --- | --- |
+| NEAR account created for the 0x address (Ethereum Wallets relayer) | `b-eth-wallet.testnet` | [HQp8sWu2…](https://testnet.nearblocks.io/txns/HQp8sWu2JN7DRpsSuAn2ZdiyNPgXokymvtAU5ND1zCax) |
+| "Set up your NEAR account": relayer adds a key that can only call `rlp_execute` | `h-eth-wallet.testnet` | [7EYjVafh…](https://testnet.nearblocks.io/txns/7EYjVafhWPD9SAmT9ghc9E9uUyExAuewv3HmBqxWnwmR) |
+| Welcome kit: 0.5 NEAR for gas | `gaballs-welcome.testnet` | [GQtCqE1f…](https://testnet.nearblocks.io/txns/GQtCqE1fQuHCbdpxrVPZfJTzJNYa9BD7ksZP9JTPMmPo) |
+| Welcome kit: storage registration on mock USDT | `gaballs-welcome.testnet` | [BnasRQyA…](https://testnet.nearblocks.io/txns/BnasRQyAASRSQq4WtXSWV7D7xkmbH9xyatWuZn3bb2f7) |
+| Welcome kit: storage registration on GABALLS | `gaballs-welcome.testnet` | [5GWeg2G4…](https://testnet.nearblocks.io/txns/5GWeg2G4xeLkZ8bZR9WUbMEpFin5Amggr3G5NQkUMsUk) |
+| Faucet: 100 mock USDT (`ft_mint` event, memo "faucet") | 0x account (MetaMask) | [EygvLFtC…](https://testnet.nearblocks.io/txns/EygvLFtCfjQdSauvuCxvnTpSfQe97ZjtTJSF2Kvtadw4) |
+| Open 1 pack: `pack_requested` #11 → OutLayer VRF → `pack_opened` pull #39, **Rare** 1.25x, 2,733,044 GABALLS | 0x account (MetaMask) | [HyooQGpa…](https://testnet.nearblocks.io/txns/HyooQGpaX1iPVaQHRrdb25423QRnaaZXnwmYGQa2RpvS) |
+| Sell 2,733,044 GABALLS back to the curve → 12.316366 mock USDT (`tokens_sold`) | 0x account (MetaMask) | [6iShdneT…](https://testnet.nearblocks.io/txns/6iShdneTrtgPnMqbWaDY7G3iA26a2RHasFoEZxbgc3eN) |
+
+Each 0x-signed transaction is an `rlp_execute` call on the player's own account; the Gaballs calls run inside it, so
+the events above are in the same transaction.
+
 ## Current: flagship GABALLS + Squads, 2026-11-11/12 UTC
 
 **`gaballs.gaballs.testnet` ($GABALLS) is the single flagship** for individuals and squads. It runs the last machine
