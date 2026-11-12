@@ -1,4 +1,11 @@
-# Not part of the site: Playwright output (videos, traces) and the e2e script.
+# Never upload local env files (dev-signer settings and the welcome-kit key live in .env.local) or local build output.
+.env*
+!.env.example
+.next
+node_modules
+# Playwright output (videos, traces), the e2e script and local screenshot/recording folders: not part of the site.
 test-results
 playwright-report
 e2e
+screens
+recordings
