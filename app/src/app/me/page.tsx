@@ -9,6 +9,7 @@ import { DeedCard } from '@/components/deed-card';
 import { PullProgress } from '@/components/pull-progress';
 import { ReadyBadge } from '@/components/ready-card';
 import { SellPanel } from '@/components/sell-panel';
+import { TopUpPanel } from '@/components/topup-panel';
 import { Button, Card, Stat } from '@/components/ui';
 import { USDT_ID, accountUrl, txUrl } from '@/config';
 import { fmtNear, fmtTokens, fmtUsdt } from '@/lib/format';
@@ -160,6 +161,8 @@ export default function MyStuff() {
           )}
         </p>
       </Card>
+
+      <TopUpPanel account={account} />
 
       {inboxes.data && inboxes.data.length > 0 && (
         <Card>
