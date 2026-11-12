@@ -37,11 +37,13 @@ export function ConnectDialog({
   onClose,
   onGoogle,
   onWallet,
+  onEthereum,
 }: {
   googleEnabled: boolean;
   onClose: () => void;
   onGoogle: () => void;
   onWallet: () => void;
+  onEthereum: () => void;
 }) {
   return (
     <Modal onBackdrop={onClose} labelledBy="connect-title">
@@ -65,8 +67,14 @@ export function ConnectDialog({
             </div>
           </>
         )}
+        <Button variant="secondary" onClick={onEthereum} data-testid="connect-ethereum">
+          MetaMask / Ethereum wallet
+        </Button>
+        <p className="-mt-1 text-center text-xs text-plum">
+          Your 0x address becomes a NEAR account. MetaMask asks you to approve each step; we send a welcome kit too.
+        </p>
         <Button variant={googleEnabled ? 'secondary' : 'primary'} onClick={onWallet} data-testid="connect-wallet">
-          Crypto wallet
+          NEAR wallet
         </Button>
         <p className="-mt-1 text-center text-xs text-plum">MyNearWallet, Meteor, HOT, Intear and other NEAR wallets.</p>
       </div>

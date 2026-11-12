@@ -30,6 +30,9 @@ type NearContextValue = {
   signAndSendTransactions: (txs: Tx[]) => Promise<ExecutionOutcome[]>;
 };
 
+/** near-connect's built-in "Ethereum Wallets" entry (MetaMask / WalletConnect, testnet supported; evm-on-near.dev). */
+const ETHEREUM_WALLETS = 'ethereum-wallets';
+
 const NearContext = createContext<NearContextValue | undefined>(undefined);
 
 /**
@@ -111,10 +114,11 @@ export function NearProvider({ children }: PropsWithChildren) {
     setDialogOpen(true);
   }, []);
 
-  const connectWallet = useCallback(async () => {
+  /** walletId: open one wallet directly, e.g. 'ethereum-wallets' (MetaMask via near-connect's Ethereum Wallets). */
+  const connectWallet = useCallback(async (walletId?: string) => {
     setDialogOpen(false);
     const connector = await getConnector();
-    const connected = await connector.connect();
+    const connected = await connector.connect(walletId ? { walletId } : undefined);
     setWallet(connected);
     const accounts = await connected.getAccounts();
     setSignedAccountId(accounts[0]?.accountId ?? '');
@@ -160,9 +164,11 @@ export function NearProvider({ children }: PropsWithChildren) {
             privy.login();
           }}
           onWallet={() => void connectWallet()}
+          onEthereum={() => void connectWallet(ETHEREUM_WALLETS)}
         />
       )}
       {google && !wallet && <WelcomeKitDialog accountId={google} />}
+      {/^0x[0-9a-f]{40}$/.test(walletAccountId) && <WelcomeKitDialog accountId={walletAccountId} />}
     </NearContext.Provider>
   );
 }
