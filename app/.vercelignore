@@ -1,9 +1,4 @@
-# Never upload local env files (dev-signer settings live in .env.local) or local build output.
-.env*
-!.env.example
-.next
-node_modules
+# Not part of the site: Playwright output (videos, traces) and the e2e script.
 test-results
 playwright-report
-screens
-recordings
+e2e
