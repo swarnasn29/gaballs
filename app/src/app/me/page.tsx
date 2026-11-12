@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 
 import { art } from '@/art/manifest';
+import { CollectionCard } from '@/components/collection';
 import { DeedCard } from '@/components/deed-card';
 import { PullProgress } from '@/components/pull-progress';
 import { ReadyBadge } from '@/components/ready-card';
@@ -211,6 +212,8 @@ export default function MyStuff() {
           </ul>
         </Card>
       )}
+
+      <CollectionCard account={account} />
 
       <Card>
         <h2 className="text-2xl font-bold">Machine NFTs</h2>

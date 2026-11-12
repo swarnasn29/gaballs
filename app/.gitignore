@@ -43,3 +43,7 @@ next-env.d.ts
 !.env.example
 
 .vercel
+
+# Playwright run output (the proof video is copied to docs/proof/game-loop/)
+/test-results/
+/playwright-report/

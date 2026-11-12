@@ -35,8 +35,18 @@ class PrivySigner extends Signer {
     return new PublicKey({ keyType: 0, data: fromHex(this.accountId) });
   }
   async signBytes(bytes: Uint8Array) {
-    const { signature } = await this.signRawHash({ address: this.accountId, chainType: 'near', hash: `0x${toHex(bytes)}` });
-    return fromHex(signature);
+    const hash = `0x${toHex(bytes)}` as const;
+    // Right after a page load Privy's embedded wallet runs in a hidden iframe that needs a few seconds to start; a sign
+    // request before that fails with "Wallet proxy not initialized". Nothing was sent then, so waiting and retrying is safe.
+    for (let attempt = 0; ; attempt++) {
+      try {
+        const { signature } = await this.signRawHash({ address: this.accountId, chainType: 'near', hash });
+        return fromHex(signature);
+      } catch (e) {
+        if (attempt >= 20 || !(e instanceof Error) || !/proxy not initiali[sz]ed/i.test(e.message)) throw e;
+        await new Promise((r) => setTimeout(r, 750));
+      }
+    }
   }
 }
 
