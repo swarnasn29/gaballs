@@ -83,11 +83,13 @@ Tests at the last checkpoint: machine 49 unit tests, sandbox 6 (incl. a real Spu
 
 ## 6. Open items
 
-- [ ] **Squad proposal #4 ("Open 1 pack") is waiting for the human's vote on camera.** It has 1 of 2 approvals
-      (buyer1, tx `5vWVBtNJinwdai1sR1ZnVyDsz4G4CqFtxEEfx4C6hf7D`). swarna2003.testnet approves in the app at
-      https://gaballs.vercel.app/squads/gaballs-squad.sputnikv2.testnet, which executes it. The squad treasury must
-      still hold ≥ 10 mock USDT then (chip in from the page if not). Sputnik proposals expire after the policy's
-      proposal period, so record this soon.
+- [x] **Squad proposal #4 ("Open 1 pack"): already approved and executed.** buyer1 voted first (tx
+      `5vWVBtNJinwdai1sR1ZnVyDsz4G4CqFtxEEfx4C6hf7D`), then swarna2003.testnet approved in the app. The pull settled as
+      flagship pull #36, request #8, tier Common, block 277269918 (2026-11-12 02:53:02 IST). Checked 2026-11-12:
+      `get_proposal {"id":4}` → status `Approved`, votes buyer1 + swarna2003. Squad treasury after it: 19.045823 mock USDT.
+      For reference, the DAO's `proposal_period` is 604,800 s (7 days): #4 was submitted 2026-11-12 02:32:18 IST and
+      would have expired 2026-11-19 02:32:18 IST (2026-11-18T21:02:18Z). If the vote was not recorded on camera, a new
+      "Open 1 pack" proposal for the video expires 7 days after it is made.
 - [ ] Art (the human provides: final machine art, icons, OG image).
 - [ ] Intents "Top up from any chain" on mainnet (CLAUDE.md section 6; tiny amounts, human watching; cut list item 2:
       keep at least a dry-quote screen).
