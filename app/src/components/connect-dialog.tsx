@@ -110,7 +110,9 @@ export function ConnectDialog({
       <h2 id="connect-title" className="text-center text-3xl font-bold text-grape">
         Start playing
       </h2>
-      <p className="mt-1 text-center text-sm text-plum">Testnet only. Mock USDT is not real money.</p>
+      <p className="mt-1 text-center text-sm text-plum">
+        Testnet only. Mock USDT is not real money. However you sign in, you can top up from any chain.
+      </p>
       <div className="mt-5 flex flex-col gap-3">
         {googleEnabled && (
           <>
@@ -128,10 +130,11 @@ export function ConnectDialog({
           </>
         )}
         <Button variant="secondary" onClick={() => setEth({ s: 'step1' })} data-testid="connect-ethereum">
-          MetaMask / Ethereum wallet
+          MetaMask or another 0x wallet
         </Button>
         <p className="-mt-1 text-center text-xs text-plum">
-          Your 0x address becomes a NEAR account. MetaMask asks you to approve each step; we send a welcome kit too.
+          Sign in with your 0x address (MetaMask, Rabby and other browser wallets): it becomes your NEAR account, and we
+          send a welcome kit.
         </p>
         <Button variant={googleEnabled ? 'secondary' : 'primary'} onClick={onWallet} data-testid="connect-wallet">
           NEAR wallet
