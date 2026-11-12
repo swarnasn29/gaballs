@@ -9,13 +9,17 @@ import type { EventMap, NearConnector, NearWalletBase } from '@hot-labs/near-con
 
 import { DevSignerBadge, devSignAndSend, devSignerAccount } from 'gaballs-dev-signer';
 
+import { ConnectDialog, WelcomeKitDialog } from '@/components/connect-dialog';
 import { NETWORK, RPC_FALLBACKS, RPC_URL } from '@/config';
+import { usePrivyBridge } from '@/providers/privy-bridge';
 import type { Tx } from '@/near/contracts';
 import type { ExecutionOutcome } from '@/near/outcome';
 
 type NearContextValue = {
   loading: boolean;
   signedAccountId: string;
+  /** How the player connected: a wallet, Google/email (Privy, silent signing), or the local dev signer. */
+  via: 'wallet' | 'google' | 'dev' | null;
   signIn: () => Promise<void>;
   signOut: () => Promise<void>;
   /**
@@ -41,14 +45,18 @@ export function NearProvider({ children }: PropsWithChildren) {
   const [walletAccountId, setSignedAccountId] = useState('');
   const [loading, setLoading] = useState(true);
   const [devAccountId, setDevAccountId] = useState('');
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const privy = usePrivyBridge();
+  const google = privy.accountId;
 
   useEffect(() => {
     if (!DEV_SIGNER_ACTIVE) return;
     void devSignerAccount().then((id) => setDevAccountId(id ?? ''));
   }, []);
 
-  const usingDevSigner = DEV_SIGNER_ACTIVE && !wallet && devAccountId !== '';
-  const signedAccountId = walletAccountId || (usingDevSigner ? devAccountId : '');
+  const usingDevSigner = DEV_SIGNER_ACTIVE && !wallet && !google && devAccountId !== '';
+  const signedAccountId = walletAccountId || google || (usingDevSigner ? devAccountId : '');
+  const via = walletAccountId ? 'wallet' : google ? 'google' : usingDevSigner ? 'dev' : null;
 
   const getConnector = useCallback(() => {
     connectorRef.current ??= import('@hot-labs/near-connect').then(
@@ -98,7 +106,13 @@ export function NearProvider({ children }: PropsWithChildren) {
     };
   }, [getConnector]);
 
+  /** Opens our connect dialog: Google/email first, crypto wallets below. */
   const signIn = useCallback(async () => {
+    setDialogOpen(true);
+  }, []);
+
+  const connectWallet = useCallback(async () => {
+    setDialogOpen(false);
     const connector = await getConnector();
     const connected = await connector.connect();
     setWallet(connected);
@@ -107,31 +121,48 @@ export function NearProvider({ children }: PropsWithChildren) {
   }, [getConnector]);
 
   const signOut = useCallback(async () => {
+    if (!wallet && google) {
+      await privy.logout();
+      return;
+    }
     if (!wallet) return;
     const connector = await getConnector();
     await connector.disconnect(wallet);
     setWallet(undefined);
     setSignedAccountId('');
-  }, [getConnector, wallet]);
+  }, [getConnector, wallet, google, privy]);
 
   const signAndSendTransactions = useCallback(
     async (txs: Tx[]) => {
+      if (!wallet && google) return privy.signAndSend(txs);
       if (!wallet && usingDevSigner) return devSignAndSend(txs);
       if (!wallet) throw new Error('Connect a wallet first');
       const outcomes = await wallet.signAndSendTransactions({ network: NETWORK, transactions: txs });
       return outcomes as unknown as ExecutionOutcome[];
     },
-    [wallet, usingDevSigner],
+    [wallet, google, privy, usingDevSigner],
   );
 
   const value = useMemo(
-    () => ({ loading, signedAccountId, signIn, signOut, signAndSendTransactions }),
-    [loading, signedAccountId, signIn, signOut, signAndSendTransactions],
+    () => ({ loading: loading || !privy.ready, signedAccountId, via: via as NearContextValue['via'], signIn, signOut, signAndSendTransactions }),
+    [loading, privy.ready, signedAccountId, via, signIn, signOut, signAndSendTransactions],
   );
   return (
     <NearContext.Provider value={value}>
       {usingDevSigner && <DevSignerBadge accountId={devAccountId} />}
       {children}
+      {dialogOpen && (
+        <ConnectDialog
+          googleEnabled={privy.enabled && privy.ready}
+          onClose={() => setDialogOpen(false)}
+          onGoogle={() => {
+            setDialogOpen(false);
+            privy.login();
+          }}
+          onWallet={() => void connectWallet()}
+        />
+      )}
+      {google && !wallet && <WelcomeKitDialog accountId={google} />}
     </NearContext.Provider>
   );
 }

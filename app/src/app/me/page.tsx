@@ -131,7 +131,7 @@ export default function MyStuff() {
     <div className="flex flex-col gap-6">
       <Card>
         <h1 className="text-3xl font-bold text-grape">My stuff</h1>
-        <p className="font-semibold text-plum">{account}</p>
+        <p className="break-all font-semibold text-plum">{account}</p>
         <dl className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
           <Stat label="NEAR" value={d ? fmtNear(d.near) : '…'} source={{ href: accountUrl(account), label: 'nearblocks' }} />
           <Stat

@@ -6,6 +6,7 @@
 
 import { useEffect, useState } from 'react';
 
+import { useNearWallet } from '@/providers/near-provider';
 import { cx } from './ui';
 
 const TYPICAL_SECONDS = 65;
@@ -29,8 +30,10 @@ const mmss = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, 
 export function PullProgress({ paidAt, count, compact }: { paidAt: number | null; count?: number; compact?: boolean }) {
   const elapsed = useElapsed(paidAt);
   const paid = paidAt !== null;
+  // Google/email players sign silently (no wallet to look at).
+  const { via } = useNearWallet();
   const steps = [
-    { label: paid ? 'Paid' : 'Paying in your wallet', state: paid ? 'done' : 'active' },
+    { label: paid ? 'Paid' : via === 'google' ? 'Paying' : 'Paying in your wallet', state: paid ? 'done' : 'active' },
     { label: 'Generating verifiable randomness (~1 min)', state: paid ? 'active' : 'todo' },
     { label: 'Reveal', state: 'todo' },
   ] as const;

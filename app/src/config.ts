@@ -32,3 +32,6 @@ export const FEATURED_SQUAD = process.env.NEXT_PUBLIC_FEATURED_SQUAD ?? `gaballs
  * (150 Tgas) and its callback (60 Tgas) inside the 300 Tgas vote transaction. Sandbox minimum: 230 Tgas.
  */
 export const SQUAD_PACK_TGAS = 270n;
+
+/** Privy app id (Google/email login, docs.near.org/web3-apps/tutorials/privy). Empty → the option is hidden. */
+export const PRIVY_APP_ID = process.env.NEXT_PUBLIC_PRIVY_APP_ID ?? '';

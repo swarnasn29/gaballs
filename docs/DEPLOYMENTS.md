@@ -1,5 +1,33 @@
 # Deployments (testnet)
 
+## No wallet needed: welcome kit + Google/email login (Privy), 2026-11-12 UTC
+
+Frontend and server only; no contract changed. Explorer: testnet.nearblocks.io.
+
+| Step | Tx |
+| --- | --- |
+| `gaballs-welcome.testnet` created by the testnet faucet (10 NEAR) | [3q9jB3p6…](https://testnet.nearblocks.io/txns/3q9jB3p64tUsZHfs1YyeJubtJWUJtKVm7D1bHLpe5JMr) |
+
+**Google/email proof run** (Privy test account, fresh; localhost, one browser tab, no window besides Privy's login).
+Player account `97da1618685fc6abd8388fcd09c2927144e6854e01af8c21caa14c944ed52d8b`. Screenshots: docs/proof/google-login/.
+
+| Step | Tx |
+| --- | --- |
+| Welcome kit: 0.5 NEAR for gas (creates the implicit account) | [4HLceLHf…](https://testnet.nearblocks.io/txns/4HLceLHfiE5C6tYAzzpKWMJonnZPCWdnBYhzW56fyVbN) |
+| Welcome kit: storage registration on mock USDT | [7xbkjkMN…](https://testnet.nearblocks.io/txns/7xbkjkMNj94Ri1gC8tMLWUjTX1ZU1RQsmDWCWF5NbKCp) |
+| Welcome kit: storage registration on GABALLS | [2HLoaqPk…](https://testnet.nearblocks.io/txns/2HLoaqPktbkbrLLTBQhbRRBKKs4P9zAcp6Fu4TgLt9zG) |
+| Faucet: 100 mock USDT (signed silently by Privy) | [4SNjRGYS…](https://testnet.nearblocks.io/txns/4SNjRGYSqAA2r9X85xJZHpexp45n77xeor9brNUsUUzZ) |
+| Open 1 pack on GABALLS (signed silently by Privy) | [4hyB6thn…](https://testnet.nearblocks.io/txns/4hyB6thnJPH5azWnyv2FJFkWbiYdhZz9egYqL8VLdDcV) |
+| Result: pull #38, Common 0.70x, 1,539,753 GABALLS, VRF request #10, block 277345073 | `get_recent_pulls` on gaballs.gaballs.testnet |
+
+First run (the human's own fresh email, before the kit was raised from 0.1 to 0.5 NEAR): account `43a58c5a…bfee74`,
+kit [CoYFSfYs…](https://testnet.nearblocks.io/txns/CoYFSfYstDNno7GjcwTF6n5jTwLR7QXTNRQE47f4WJdq), faucet
+[BrkQxnYu…](https://testnet.nearblocks.io/txns/BrkQxnYujNj5hnjQoMcy9sE11ya4MxTgghexMisemHfG). The pack was refused
+before sending: a 300 Tgas pack needs ~0.30 NEAR available (gas is held at a pessimistic price, most is refunded).
+Manual top-up 0.4 NEAR [BQmJWCrK…](https://testnet.nearblocks.io/txns/BQmJWCrKBdPBzpwRneJYb2haMfRbNph5cvk456m5MjB9),
+then pack [GohpAdX9…](https://testnet.nearblocks.io/txns/GohpAdX9yPaLABcGULhysGGRJgY9xMKU7SVTZCaNwP1Q) → pull #37,
+Common, VRF request #9.
+
 ## Current: flagship GABALLS + Squads, 2026-11-11/12 UTC
 
 **`gaballs.gaballs.testnet` ($GABALLS) is the single flagship** for individuals and squads. It runs the last machine
