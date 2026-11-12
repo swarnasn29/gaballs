@@ -32,6 +32,8 @@ type NearContextValue = {
 
 /** near-connect's built-in "Ethereum Wallets" entry (MetaMask / WalletConnect, testnet supported; evm-on-near.dev). */
 const ETHEREUM_WALLETS = 'ethereum-wallets';
+/** Highest gas per action that evm-on-near.dev accepts (its bundle: 270000000000000). */
+const EVM_MAX_GAS = 270_000_000_000_000n;
 
 const NearContext = createContext<NearContextValue | undefined>(undefined);
 
@@ -141,7 +143,20 @@ export function NearProvider({ children }: PropsWithChildren) {
       if (!wallet && google) return privy.signAndSend(txs);
       if (!wallet && usingDevSigner) return devSignAndSend(txs);
       if (!wallet) throw new Error('Connect a wallet first');
-      const outcomes = await wallet.signAndSendTransactions({ network: NETWORK, transactions: txs });
+      // Ethereum Wallets (evm-on-near.dev) refuses any action above 270 Tgas ("Amount exceeds protocol limit"): its
+      // calls run through the account's rlp_execute, which needs some of the 300 Tgas itself. 270 Tgas is what squad
+      // packs already use on testnet (docs/DEPLOYMENTS.md: "open 5 packs", 270 Tgas), so cap there for that wallet only.
+      const forWallet =
+        wallet.manifest?.id === ETHEREUM_WALLETS
+          ? txs.map((tx) => ({
+              ...tx,
+              actions: tx.actions.map((a) => ({
+                ...a,
+                params: { ...a.params, gas: (BigInt(a.params.gas) > EVM_MAX_GAS ? EVM_MAX_GAS : BigInt(a.params.gas)).toString() },
+              })),
+            }))
+          : txs;
+      const outcomes = await wallet.signAndSendTransactions({ network: NETWORK, transactions: forWallet });
       return outcomes as unknown as ExecutionOutcome[];
     },
     [wallet, google, privy, usingDevSigner],

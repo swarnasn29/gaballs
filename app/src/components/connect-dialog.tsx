@@ -7,9 +7,10 @@
 import { useEffect, useRef, useState } from 'react';
 
 import { USDT_ID, txUrl } from '@/config';
+import { addNearNetwork } from '@/lib/evm-network';
 import { shortAccount } from '@/lib/format';
 import { view } from '@/near/rpc';
-import { Button } from './ui';
+import { Button, cx } from './ui';
 
 function Modal({ children, onBackdrop, labelledBy }: { children: React.ReactNode; onBackdrop?: () => void; labelledBy: string }) {
   useEffect(() => {
@@ -45,6 +46,65 @@ export function ConnectDialog({
   onWallet: () => void;
   onEthereum: () => void;
 }) {
+  const [eth, setEth] = useState<null | { s: 'step1' } | { s: 'adding' } | { s: 'step2' } | { s: 'error'; message: string }>(null);
+
+  const addNetwork = async () => {
+    setEth({ s: 'adding' });
+    try {
+      const r = await addNearNetwork();
+      if (r === 'no-wallet') return setEth({ s: 'error', message: 'MetaMask was not found in this browser. Install it, then try again.' });
+      setEth({ s: 'step2' });
+    } catch (e) {
+      const code = (e as { code?: number })?.code;
+      setEth({ s: 'error', message: code === 4001 ? 'You declined adding the network. It is needed to sign in.' : e instanceof Error ? e.message : 'MetaMask could not add the network.' });
+    }
+  };
+
+  if (eth)
+    return (
+      <Modal onBackdrop={onClose} labelledBy="eth-title">
+        <h2 id="eth-title" className="text-center text-2xl font-bold text-grape">
+          MetaMask sign-in
+        </h2>
+        <ol className="mt-4 space-y-3 text-sm">
+          <li className={cx('rounded-2xl p-3', eth.s === 'step2' ? 'bg-blush' : 'border-2 border-lilac')}>
+            <p className="font-bold">Step 1 of 2: add the NEAR network to MetaMask</p>
+            <p className="mt-1 text-xs text-plum">
+              MetaMask asks you to add <b>NEAR Protocol Testnet</b> (chain 398, RPC eth-rpc.testnet.near.org). It is a test
+              network; nothing is spent.
+            </p>
+            {eth.s === 'step2' ? (
+              <p className="mt-2 text-xs font-semibold text-grape" data-testid="eth-step1-done">
+                Done
+              </p>
+            ) : (
+              <Button className="mt-2 w-full" onClick={() => void addNetwork()} disabled={eth.s === 'adding'} data-testid="eth-add-network">
+                {eth.s === 'adding' ? 'Check MetaMask…' : 'Add NEAR network'}
+              </Button>
+            )}
+            {eth.s === 'error' && (
+              <p className="mt-2 text-xs text-red-700" role="alert">
+                {eth.message}
+              </p>
+            )}
+          </li>
+          <li className={cx('rounded-2xl p-3', eth.s === 'step2' ? 'border-2 border-lilac' : 'opacity-50')}>
+            <p className="font-bold">Step 2 of 2: sign in</p>
+            <p className="mt-1 text-xs text-plum">
+              A sign-in window opens: pick MetaMask, then approve <b>Connect</b> and <b>Set up your NEAR account</b> (free, paid
+              by NEAR&apos;s relayer). After that, each pack is one MetaMask approval.
+            </p>
+            <Button className="mt-2 w-full" onClick={onEthereum} disabled={eth.s !== 'step2'} data-testid="eth-sign-in">
+              Sign in with MetaMask
+            </Button>
+          </li>
+        </ol>
+        <Button variant="ghost" className="mt-3 w-full" onClick={onClose}>
+          Cancel
+        </Button>
+      </Modal>
+    );
+
   return (
     <Modal onBackdrop={onClose} labelledBy="connect-title">
       <h2 id="connect-title" className="text-center text-3xl font-bold text-grape">
@@ -67,7 +127,7 @@ export function ConnectDialog({
             </div>
           </>
         )}
-        <Button variant="secondary" onClick={onEthereum} data-testid="connect-ethereum">
+        <Button variant="secondary" onClick={() => setEth({ s: 'step1' })} data-testid="connect-ethereum">
           MetaMask / Ethereum wallet
         </Button>
         <p className="-mt-1 text-center text-xs text-plum">
