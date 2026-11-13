@@ -8,6 +8,7 @@ import { useEffect, useState } from 'react';
 
 import { Stat } from '@/components/ui';
 import { machine } from '@/near/contracts';
+import { isLaunchedMachine } from '@/lib/trust';
 
 type Check = { label: string; ok: boolean | null; detail: string };
 
@@ -47,6 +48,8 @@ export function ProofCheck(p: {
   useEffect(() => {
     let live = true;
     (async () => {
+      // The key must come from a machine the Gaballs factory launched, or a lookalike could "verify" its own proofs.
+      if (!(await isLaunchedMachine(p.machine))) throw new Error(`${p.machine} is not a Gaballs machine, so its proof is not checked here.`);
       const view = await machine(p.machine).get();
       const key = view.config.vrf?.pubkey_hex;
       if (!key) throw new Error(`${p.machine} has no VRF config (v1 machine: block randomness).`);

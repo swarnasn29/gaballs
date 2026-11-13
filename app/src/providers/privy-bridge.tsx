@@ -14,6 +14,7 @@ import { Account, FailoverRpcProvider, JsonRpcProvider, PublicKey, Signer, actio
 import { createContext, type PropsWithChildren, useContext, useEffect, useMemo, useRef } from 'react';
 
 import { PRIVY_APP_ID, RPC_FALLBACKS, RPC_URL } from '@/config';
+import { assertAllowedReceivers } from '@/lib/trust';
 import type { Tx } from '@/near/contracts';
 import type { ExecutionOutcome } from '@/near/outcome';
 
@@ -112,6 +113,8 @@ function Bridge({ children }: PropsWithChildren) {
       getAccessToken,
       signAndSend: async (txs) => {
         if (!account) throw new Error('Log in first');
+        // This signer shows no popup, so it checks the receivers itself too (defence in depth; see src/lib/trust.ts).
+        assertAllowedReceivers(txs);
         const out: ExecutionOutcome[] = [];
         for (const tx of txs) {
           const res = await account

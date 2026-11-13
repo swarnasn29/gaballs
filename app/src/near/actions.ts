@@ -9,8 +9,20 @@ import { FEATURED_MACHINE } from '@/config';
 import { factory, machine, nft, usdt, type Tx } from './contracts';
 import { createSquadTx, squadIdFor, voteTx } from './sputnik';
 import { readPackOutcome, type ExecutionOutcome, type PackResult } from './outcome';
+import { MAX_STORAGE_DEPOSIT, PACK_PRICE_UNITS, isLaunchedMachine, isMachineId, isSquadId } from '@/lib/trust';
 
 export class UserFacingError extends Error {}
+
+/** Refuses anything that is not a Gaballs machine (an id from a link could point at a lookalike contract). */
+async function requireMachine(machineId: string, launched = false) {
+  if (!isMachineId(machineId) || (launched && !(await isLaunchedMachine(machineId))))
+    throw new UserFacingError(`${machineId} is not a Gaballs machine, so nothing was signed.`);
+}
+
+/** A storage registration costs ~0.00125 NEAR; a contract asking for more than MAX_STORAGE_DEPOSIT is refused. */
+function requireSmallDeposit(min: string) {
+  if (BigInt(min) > MAX_STORAGE_DEPOSIT) throw new UserFacingError('Refused: the contract asked for an unusually large storage deposit.');
+}
 
 function lastOutcome(outcomes: ExecutionOutcome[]): ExecutionOutcome {
   const last = outcomes[outcomes.length - 1];
@@ -33,6 +45,7 @@ export function useGaballsActions() {
   const openPack = useCallback(
     async (machineId: string, count: number): Promise<PackResult> => {
       const me = requireAccount();
+      await requireMachine(machineId, true);
       const m = machine(machineId);
       const [info, registered, bounds, usdtBalance] = await Promise.all([
         m.get(),
@@ -40,6 +53,9 @@ export function useGaballsActions() {
         m.storageBounds(),
         usdt.balanceOf(me),
       ]);
+      // Every Gaballs machine charges exactly 10 USDT a pack; a different price means it is not ours.
+      if (BigInt(info.config.pack_price) !== PACK_PRICE_UNITS) throw new UserFacingError('Refused: unexpected pack price.');
+      if (!registered) requireSmallDeposit(bounds.min);
       const cost = BigInt(info.config.pack_price) * BigInt(count);
       if (BigInt(usdtBalance) < cost) {
         throw new UserFacingError('Not enough mock USDT. Use the faucet on "My stuff" (100 USDT per hour).');
@@ -77,7 +93,10 @@ export function useGaballsActions() {
   );
 
   const sweepFees = useCallback(
-    async (machineId: string) => lastOutcome(await signAndSendTransactions([machine(machineId).sweepFeesTx()])),
+    async (machineId: string) => {
+      await requireMachine(machineId);
+      return lastOutcome(await signAndSendTransactions([machine(machineId).sweepFeesTx()]));
+    },
     [signAndSendTransactions],
   );
 
@@ -103,6 +122,7 @@ export function useGaballsActions() {
   const sell = useCallback(
     async (machineId: string, amount: string, minUsdtOut: string) => {
       const me = requireAccount();
+      await requireMachine(machineId);
       const [registered, bounds] = await Promise.all([usdt.storageBalanceOf(me), usdt.storageBounds()]);
       const txs: Tx[] = [];
       if (!registered) txs.push(usdt.storageDepositTx(me, bounds.min));
@@ -116,6 +136,7 @@ export function useGaballsActions() {
   const refundExpired = useCallback(
     async (machineId: string, requestId: number) => {
       requireAccount();
+      await requireMachine(machineId);
       return lastOutcome(await signAndSendTransactions([machine(machineId).refundExpiredTx(requestId)]));
     },
     [requireAccount, signAndSendTransactions],
@@ -154,6 +175,7 @@ export function useGaballsActions() {
   const vote = useCallback(
     async (dao: string, id: number, approve: boolean) => {
       requireAccount();
+      if (!isSquadId(dao)) throw new UserFacingError(`${dao} is not a Sputnik DAO squad.`);
       return lastOutcome(await signAndSendTransactions([voteTx(dao, id, approve)]));
     },
     [requireAccount, signAndSendTransactions],
@@ -163,6 +185,7 @@ export function useGaballsActions() {
   const chipIn = useCallback(
     async (dao: string, amount: string) => {
       requireAccount();
+      if (!isSquadId(dao)) throw new UserFacingError(`${dao} is not a Sputnik DAO squad, so nothing was sent.`);
       const [registered, bounds] = await Promise.all([usdt.storageBalanceOf(dao), usdt.storageBounds()]);
       const txs: Tx[] = [];
       if (!registered) txs.push(usdt.storageDepositTx(dao, bounds.min));

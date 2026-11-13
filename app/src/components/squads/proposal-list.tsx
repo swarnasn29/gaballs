@@ -71,7 +71,7 @@ export function ProposalList({
       {list.data?.length === 0 && <p className="text-sm text-plum">No proposals yet. Members propose on the right.</p>}
       <ul className="flex flex-col gap-3" aria-live="polite">
         {(list.data ?? []).map((p) => {
-          const d = describe(p);
+          const d = describe(p, members);
           const yes = approvals(p);
           const no = rejections(p);
           const mine = p.votes[account];
@@ -91,6 +91,19 @@ export function ProposalList({
                 Proposed by {shortAccount(p.proposer)}
                 {d.machine ? ` · on ${d.machine}` : ''}
               </p>
+              {p.description && <p className="text-sm">&ldquo;{p.description}&rdquo;</p>}
+              {d.warning && (
+                <p className="rounded-2xl bg-tier-mythic/20 p-2 text-sm font-semibold text-ink ring-2 ring-warn" role="alert" data-testid="proposal-warning">
+                  {d.warning}
+                </p>
+              )}
+              <ul className="list-disc pl-5 text-xs text-plum" data-testid="proposal-actions">
+                {d.details.map((line, i) => (
+                  <li key={i} className="break-all">
+                    {line}
+                  </li>
+                ))}
+              </ul>
               <div className="flex items-center gap-2">
                 <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-white" aria-hidden>
                   <div className="h-full rounded-full bg-grape transition-[width]" style={{ width: `${Math.min(100, (yes / Math.max(1, needed)) * 100)}%` }} />

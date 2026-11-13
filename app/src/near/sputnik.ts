@@ -5,6 +5,8 @@
 
 import { NFT_ID, SPUTNIK_FACTORY, SQUAD_CREATE_NEAR, SQUAD_PACK_TGAS, USDT_ID } from '@/config';
 import { TGAS, type Tx } from './contracts';
+import { MAX_STORAGE_DEPOSIT, PACK_PRICE_UNITS, isMachineId } from '@/lib/trust';
+import { fmtNear, fmtTokens, fmtUsdt } from '@/lib/format';
 import { view } from './rpc';
 import type { AccountId, U128 } from './types';
 
@@ -175,29 +177,98 @@ export const proposals = {
     proposeTx(dao, `Claim the fees of ${tokenId}`, NFT_ID, [action('claim', { token_id: tokenId }, 1n, 60n)]),
 };
 
-/** Plain-words summary of a Gaballs-shaped proposal (falls back to the raw method names). */
-export function describe(p: Proposal): { kind: 'open' | 'split' | 'sell' | 'claim' | 'other'; text: string; machine?: string } {
+export type ProposalKind = 'open' | 'split' | 'sell' | 'claim' | 'other';
+
+export interface ProposalSummary {
+  kind: ProposalKind;
+  /** One line for the card. Friendly only when every action matches a Gaballs shape exactly. */
+  text: string;
+  machine?: string;
+  /** Set for anything not recognised: voters must read the actions before approving. */
+  warning?: string;
+  /** Every action, in plain words: what it calls, on which contract, to whom and how much. Always shown. */
+  details: string[];
+}
+
+const ONE = '1';
+const str = (v: unknown) => (typeof v === 'string' ? v : v === undefined ? '' : JSON.stringify(v));
+
+/** One line per action, nothing hidden: method, contract, receiver/account, amount and attached NEAR. */
+function actionLines(receiver: AccountId, actions: ActionCall[]): string[] {
+  return actions.map((a) => {
+    const args = decodeArgs(a);
+    const who = str(args.receiver_id ?? args.account_id);
+    const amount = str(args.amount);
+    const shown = amount
+      ? receiver === USDT_ID
+        ? ` ${fmtUsdt(amount)}`
+        : isMachineId(receiver)
+          ? ` ${fmtTokens(amount)} tokens`
+          : ` ${amount} units`
+      : '';
+    const near = BigInt(a.deposit || '0') > 1n ? ` (attaches ${fmtNear(a.deposit)})` : '';
+    return `${a.method_name} on ${receiver}${shown}${who ? ` to ${who}` : ''}${near}`;
+  });
+}
+
+/**
+ * Plain-words summary of a squad proposal. A friendly label is given ONLY when every action matches one of the
+ * shapes this app builds (src/near/sputnik.ts proposals) with Gaballs contracts, the fixed pack price and, for a split,
+ * payments to council members only. Anything else is "Unrecognised" with a warning, so a proposal cannot hide a
+ * payout behind a harmless first action.
+ */
+export function describe(p: Proposal, members: AccountId[] = []): ProposalSummary {
   const fc = p.kind.FunctionCall;
-  if (!fc) return { kind: 'other', text: Object.keys(p.kind)[0] ?? 'Proposal' };
-  const first = fc.actions[0];
-  const args = first ? decodeArgs(first) : {};
-  if (fc.receiver_id === USDT_ID && first?.method_name === 'ft_transfer_call') {
-    const msg = (() => {
-      try {
-        return JSON.parse(String(args.msg ?? '{}')) as { count?: number };
-      } catch {
-        return {};
-      }
-    })();
-    return { kind: 'open', text: `Open ${msg.count ?? '?'} pack${msg.count === 1 ? '' : 's'}`, machine: String(args.receiver_id ?? '') };
+  if (!fc) {
+    const kind = Object.keys(p.kind)[0] ?? 'Proposal';
+    return { kind: 'other', text: `${kind} (not a Gaballs action)`, warning: 'Not a Gaballs proposal: check it on the DAO before voting.', details: [JSON.stringify(p.kind).slice(0, 300)] };
   }
-  if (fc.actions.some((a) => a.method_name === 'ft_transfer')) {
-    const n = fc.actions.filter((a) => a.method_name === 'ft_transfer').length;
-    return { kind: 'split', text: `Split the prize ${n} ways`, machine: fc.receiver_id };
+  const { receiver_id: receiver, actions } = fc;
+  const details = actionLines(receiver, actions);
+  const other = (why: string): ProposalSummary => ({
+    kind: 'other',
+    text: 'Unrecognised proposal',
+    warning: `${why} Read every action below before you vote.`,
+    details,
+  });
+  if (actions.length === 0) return other('It has no actions.');
+  const args = actions.map(decodeArgs);
+  const only = actions.length === 1 ? actions[0] : null;
+
+  // Open packs: one ft_transfer_call of exactly count x 10 USDT on mock USDT to a Gaballs machine.
+  if (receiver === USDT_ID && only?.method_name === 'ft_transfer_call') {
+    const machineId = str(args[0].receiver_id);
+    let count = 0;
+    try {
+      const msg = JSON.parse(str(args[0].msg)) as { action?: string; count?: number };
+      if (msg.action === 'open_pack' && Number.isInteger(msg.count)) count = msg.count ?? 0;
+    } catch {
+      /* not a pack message */
+    }
+    const amountOk = count >= 1 && count <= 5 && str(args[0].amount) === (PACK_PRICE_UNITS * BigInt(count)).toString();
+    if (isMachineId(machineId) && amountOk && only.deposit === ONE)
+      return { kind: 'open', text: `Open ${count} pack${count === 1 ? '' : 's'} (${fmtUsdt(PACK_PRICE_UNITS * BigInt(count))})`, machine: machineId, details };
+    return other('It sends USDT, but not as a Gaballs pack payment.');
   }
-  if (first?.method_name === 'sell') return { kind: 'sell', text: 'Sell tokens back to the curve', machine: fc.receiver_id };
-  if (fc.receiver_id === NFT_ID && first?.method_name === 'claim') return { kind: 'claim', text: `Claim fees of ${String(args.token_id)}` };
-  return { kind: 'other', text: `${fc.actions.map((a) => a.method_name).join(', ')} on ${fc.receiver_id}` };
+
+  // Split: on a Gaballs machine's token, only storage registrations and transfers, all to council members.
+  if (isMachineId(receiver) && actions.every((a) => a.method_name === 'storage_deposit' || a.method_name === 'ft_transfer')) {
+    const targets = args.map((a) => str(a.receiver_id ?? a.account_id));
+    const toMembers = targets.every((t) => members.includes(t));
+    const smallDeposits = actions.every((a) => BigInt(a.deposit || '0') <= MAX_STORAGE_DEPOSIT);
+    const n = actions.filter((a) => a.method_name === 'ft_transfer').length;
+    if (n > 0 && toMembers && smallDeposits)
+      return { kind: 'split', text: `Split the prize ${n} way${n === 1 ? '' : 's'} between members`, machine: receiver, details };
+    return other(toMembers ? 'It moves tokens in an unusual way.' : 'It sends tokens to someone who is not a member.');
+  }
+
+  if (isMachineId(receiver) && only?.method_name === 'sell' && only.deposit === ONE)
+    return { kind: 'sell', text: 'Sell tokens back to the curve', machine: receiver, details };
+
+  if (receiver === NFT_ID && only?.method_name === 'claim' && only.deposit === ONE && str(args[0].token_id).startsWith('machine:'))
+    return { kind: 'claim', text: `Claim fees of ${str(args[0].token_id)}`, details };
+
+  return other('It does not match anything this app proposes.');
 }
 
 export const approvals = (p: Proposal) => Object.values(p.votes).filter((v) => v === 'Approve').length;

@@ -329,6 +329,18 @@ See [docs/DEPLOYMENTS.md](docs/DEPLOYMENTS.md).
 Threat model for the Machine NFT (every way a seller could try to keep the fees) and for the VRF check:
 [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md).
 
+App-side protections (`app/src/lib/trust.ts`). Contract ids can come from a link, and Google/email players sign
+without a wallet popup, so the app only talks to Gaballs contracts:
+- **Lookalike machines and squads are refused.** Only `gaballs.testnet` can create `<symbol>.gaballs.testnet`
+  accounts, and the factory's `get_machine` must list it; squads must be `<name>.sputnikv2.testnet` (only the Sputnik
+  factory can create those). Check: open `https://gaballs.vercel.app/machine/gaballs.gaballs-official.testnet` →
+  "Not a Gaballs machine".
+- **Signer allow-list.** Every signing path refuses a transaction to any other contract before signing; opening a
+  pack also requires the fixed 10 USDT price and a small storage deposit.
+- **Squad proposals are decoded strictly.** A friendly label ("Open 1 pack ($10)") appears only when every action
+  matches what this app builds; anything else is "Unrecognised proposal" with a warning, and every card lists every
+  action (contract, receiver, amount, attached NEAR) and the proposer's description.
+
 Known limits:
 - Testnet only. Mock USDT is not real money. The NEAR Intents top-up is the mainnet path and quotes real USDT; its
   real-deposit step has not been exercised with real funds.

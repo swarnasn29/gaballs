@@ -11,6 +11,7 @@ import { DevSignerBadge, devSignAndSend, devSignerAccount } from 'gaballs-dev-si
 
 import { ConnectDialog, WelcomeKitDialog } from '@/components/connect-dialog';
 import { NETWORK, RPC_FALLBACKS, RPC_URL } from '@/config';
+import { assertAllowedReceivers } from '@/lib/trust';
 import { usePrivyBridge } from '@/providers/privy-bridge';
 import type { Tx } from '@/near/contracts';
 import type { ExecutionOutcome } from '@/near/outcome';
@@ -140,6 +141,8 @@ export function NearProvider({ children }: PropsWithChildren) {
 
   const signAndSendTransactions = useCallback(
     async (txs: Tx[]) => {
+      // Nothing is signed for a contract outside the Gaballs list (src/lib/trust.ts), whichever way the player signs.
+      assertAllowedReceivers(txs);
       if (!wallet && google) return privy.signAndSend(txs);
       if (!wallet && usingDevSigner) return devSignAndSend(txs);
       if (!wallet) throw new Error('Connect a wallet first');
