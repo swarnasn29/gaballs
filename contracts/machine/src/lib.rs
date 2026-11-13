@@ -126,7 +126,7 @@ pub struct PendingPull {
     pub request_id: u64,
     pub buyer: AccountId,
     pub count: u32,
-    /// USDT held for this request (pack_price * count).
+    /// USDT held for this request (`count` packs of `usdt / count` each).
     pub usdt: U128,
     /// The user seed sent to OutLayer; the proof's alpha must end in it.
     pub seed: String,
@@ -149,8 +149,11 @@ pub struct LaunchArgs {
     pub usdt_contract: AccountId,
     pub nft_contract: AccountId,
     pub platform_account: AccountId,
-    /// In USDT units (6 decimals). 10 USDT = 10_000_000.
+    /// In USDT units (6 decimals). 10 USDT = 10_000_000. The smallest pack (and the fixed price for `count` packs).
     pub pack_price: U128,
+    /// Largest single pack (USDT units). A pack can be any amount from `pack_price` to this. None = `pack_price`
+    /// (fixed-size packs only).
+    pub max_pack_price: Option<U128>,
     /// Virtual USDT reserve V (6 decimals). Default 3,000 USDT.
     pub virtual_usdt_reserve: U128,
     /// Tokens (18 decimals) put in the prize vault at launch. Default 100M.
@@ -168,7 +171,10 @@ pub struct Config {
     pub nft_contract: AccountId,
     pub platform_account: AccountId,
     pub nft_token_id: String,
+    /// Smallest pack, in USDT units; also the per-pack price of a `count` payment.
     pub pack_price: U128,
+    /// Largest single pack, in USDT units. Any amount in [pack_price, max_pack_price] opens one pack of that size.
+    pub max_pack_price: U128,
     pub virtual_usdt_reserve: U128,
     pub curve_inventory: U128,
     pub vault_seed: U128,
@@ -273,7 +279,14 @@ pub struct Machine {
 #[serde(crate = "near_sdk::serde")]
 struct PackMsg {
     action: String,
-    count: u32,
+    /// Fixed-size packs: `amount` must equal `pack_price * count`. Omitted: one pack of size `amount`.
+    count: Option<u32>,
+}
+
+/// A validated pack payment: `count` packs of `per_pack` USDT units each.
+pub(crate) struct PackOrder {
+    pub count: u32,
+    pub per_pack: u128,
 }
 
 #[near]
@@ -286,6 +299,9 @@ impl Machine {
         require!(vault_seed > 0, "vault_seed must be positive");
         require!(vault_seed + creator_allocation < TOTAL_SUPPLY, "vault_seed + creator_allocation leave no curve");
         require!(args.pack_price.0 > 0, "pack_price must be positive");
+        let max_pack_price = args.max_pack_price.unwrap_or(args.pack_price);
+        require!(max_pack_price.0 >= args.pack_price.0, "max_pack_price must be at least pack_price");
+        require!(max_pack_price.0 <= 1_000_000 * 1_000_000, "max_pack_price is above 1,000,000 USDT");
         require!(args.virtual_usdt_reserve.0 > 0, "virtual_usdt_reserve must be positive");
         require!(
             args.max_vault_draw_bps > 0 && args.max_vault_draw_bps <= odds::BPS,
@@ -319,6 +335,7 @@ impl Machine {
             platform_account: args.platform_account,
             nft_token_id: format!("machine:{machine_id}"),
             pack_price: args.pack_price,
+            max_pack_price,
             virtual_usdt_reserve: args.virtual_usdt_reserve,
             curve_inventory: U128(curve_inventory),
             vault_seed: args.vault_seed,
@@ -483,7 +500,8 @@ impl Machine {
             }
         };
         // The curve may have moved since the request; refund rather than settle a pack that buys nothing.
-        if let Err(reason) = self.check_curve_for(pending.count) {
+        let per_pack = pending.usdt.0 / u128::from(pending.count);
+        if let Err(reason) = self.check_curve_for(pending.count, per_pack) {
             self.refund(pending, &reason);
             return false;
         }
@@ -500,7 +518,7 @@ impl Machine {
                 tier = usize::from(forced[0]);
             }
             let vrf = VrfInfo { request_id, alpha: proof.alpha.clone(), signature_hex: signature_hex.clone() };
-            self.settle_pack(&pending.buyer, pull_id, roll, tier, h, vrf);
+            self.settle_pack(&pending.buyer, per_pack, pull_id, roll, tier, h, vrf);
         }
         true
     }
@@ -711,7 +729,7 @@ impl Machine {
     /// and the expected payout at the odds table's expected multiplier.
     pub fn quote_pack(&self, count: u32) -> PackQuote {
         require!(count >= 1 && count <= MAX_PACKS_PER_CALL, "count must be 1..=5");
-        let (nft_fee, platform_fee, to_curve) = self.split_pack_price();
+        let (nft_fee, platform_fee, to_curve) = self.split_pack(self.config.pack_price.0);
         let (v, mut r, mut t) = (self.config.virtual_usdt_reserve.0, self.curve_usdt, self.curve_tokens);
         let mut bought = 0u128;
         for _ in 0..count {
@@ -728,6 +746,32 @@ impl Machine {
             usdt_to_curve: U128(to_curve * n),
             bought: U128(bought),
             expected_payout: U128(curve::bps_of(bought, odds::expected_multiplier_bps(&self.odds))),
+            price_now: U128(self.price()),
+        }
+    }
+
+    /// What one pack of `amount` USDT units would buy right now (`pack_price` <= amount <= `max_pack_price`):
+    /// fees, USDT into the curve, tokens bought, the expected payout, and the most it can pay (Mythic, after the
+    /// vault cap at today's vault).
+    pub fn quote_pack_amount(&self, amount: U128) -> PackAmountQuote {
+        require!(
+            amount.0 >= self.config.pack_price.0 && amount.0 <= self.config.max_pack_price.0,
+            "amount must be between pack_price and max_pack_price"
+        );
+        let (nft_fee, platform_fee, to_curve) = self.split_pack(amount.0);
+        let bought = curve::tokens_out(self.config.virtual_usdt_reserve.0, self.curve_usdt, self.curve_tokens, to_curve);
+        let best_bps = self.odds.iter().map(|t| t.multiplier_bps).max().unwrap_or(odds::BPS);
+        let raw_max = curve::bps_of(bought, best_bps);
+        let vault_room = curve::bps_of(self.vault, self.config.max_vault_draw_bps);
+        let max_payout = if raw_max > bought { bought + (raw_max - bought).min(vault_room) } else { raw_max };
+        PackAmountQuote {
+            amount,
+            fees: U128(nft_fee + platform_fee),
+            usdt_to_curve: U128(to_curve),
+            bought: U128(bought),
+            expected_payout: U128(curve::bps_of(bought, odds::expected_multiplier_bps(&self.odds))),
+            max_payout: U128(max_payout),
+            max_payout_capped: raw_max > max_payout,
             price_now: U128(self.price()),
         }
     }
@@ -816,6 +860,20 @@ pub struct PackQuote {
     pub price_now: U128,
 }
 
+#[near(serializers = [json])]
+pub struct PackAmountQuote {
+    pub amount: U128,
+    pub fees: U128,
+    pub usdt_to_curve: U128,
+    pub bought: U128,
+    pub expected_payout: U128,
+    /// The most this pack can pay right now: a Mythic, limited by the vault cap.
+    pub max_payout: U128,
+    /// True when the vault cap (not the 8x multiplier) sets `max_payout`.
+    pub max_payout_capped: bool,
+    pub price_now: U128,
+}
+
 // -------------------------------------------------------------------- internals
 
 impl Machine {
@@ -832,45 +890,59 @@ impl Machine {
         TOTAL_SUPPLY - self.curve_tokens - self.vault
     }
 
-    /// (nft fee, platform fee, USDT into the curve) for one pack. Fees round down.
-    fn split_pack_price(&self) -> (u128, u128, u128) {
-        let price = self.config.pack_price.0;
+    /// (nft fee, platform fee, USDT into the curve) for one pack of `price` USDT units. Fees round down.
+    fn split_pack(&self, price: u128) -> (u128, u128, u128) {
         let nft_fee = curve::bps_of(price, self.config.nft_fee_bps);
         let platform_fee = curve::bps_of(price, self.config.platform_fee_bps);
         (nft_fee, platform_fee, price - nft_fee - platform_fee)
     }
 
     /// Checks everything that could make a pull fail *before* any state changes, so a pack either fully
-    /// settles or the whole payment is refunded. Returns the pack count or the refund reason.
-    fn validate_pack_request(&self, buyer: &AccountId, amount: u128, msg: &str) -> Result<u32, String> {
+    /// settles or the whole payment is refunded. Returns the order or the refund reason.
+    ///
+    /// `{"action":"open_pack","count":N}`: N packs of exactly `pack_price` (amount must be `pack_price * N`).
+    /// `{"action":"open_pack"}`: one pack of size `amount`, anywhere from `pack_price` to `max_pack_price`.
+    pub(crate) fn validate_pack_request(&self, buyer: &AccountId, amount: u128, msg: &str) -> Result<PackOrder, String> {
         let req: PackMsg = serde_json::from_str(msg).map_err(|e| format!("bad msg: {e}"))?;
         if req.action != "open_pack" {
             return Err(format!("unknown action '{}'", req.action));
         }
-        if req.count == 0 || req.count > MAX_PACKS_PER_CALL {
-            return Err("count must be 1..=5".to_string());
-        }
-        let expected = self.config.pack_price.0 * u128::from(req.count);
-        if amount != expected {
-            return Err(format!("amount {amount} != pack_price * count = {expected}"));
-        }
+        let order = match req.count {
+            Some(count) => {
+                if count == 0 || count > MAX_PACKS_PER_CALL {
+                    return Err("count must be 1..=5".to_string());
+                }
+                let expected = self.config.pack_price.0 * u128::from(count);
+                if amount != expected {
+                    return Err(format!("amount {amount} != pack_price * count = {expected}"));
+                }
+                PackOrder { count, per_pack: self.config.pack_price.0 }
+            }
+            None => {
+                let (min, max) = (self.config.pack_price.0, self.config.max_pack_price.0);
+                if amount < min || amount > max {
+                    return Err(format!("amount {amount} is outside the pack range {min}..={max}"));
+                }
+                PackOrder { count: 1, per_pack: amount }
+            }
+        };
         if !self.token.accounts.contains_key(buyer) {
             return Err(format!("{buyer} is not registered on this token (call storage_deposit first)"));
         }
         if buyer == &env::current_account_id() {
             return Err("the machine cannot buy from itself".to_string());
         }
-        self.check_curve_for(req.count)?;
+        self.check_curve_for(order.count, order.per_pack)?;
         // The machine pays OutLayer from its own NEAR; without enough, refund now rather than strand the USDT.
         if free_near_balance() < MIN_OPERATING_BALANCE.saturating_add(VRF_DEPOSIT) {
             return Err("machine NEAR balance too low to pay for VRF (anyone can top it up)".to_string());
         }
-        Ok(req.count)
+        Ok(order)
     }
 
     /// A curve that is nearly sold out could give 0 tokens for a pack; refund instead of panicking.
-    fn check_curve_for(&self, count: u32) -> Result<(), String> {
-        let (_, _, to_curve) = self.split_pack_price();
+    fn check_curve_for(&self, count: u32, per_pack: u128) -> Result<(), String> {
+        let (_, _, to_curve) = self.split_pack(per_pack);
         let (v, mut r, mut t) = (self.config.virtual_usdt_reserve.0, self.curve_usdt, self.curve_tokens);
         for _ in 0..count {
             let b = curve::tokens_out(v, r, t, to_curve);
@@ -961,16 +1033,18 @@ impl Machine {
 
     /// Buys on the curve, applies the tier multiplier against the vault, pays the buyer and records the
     /// pull. Callers must have checked the curve (`check_curve_for`); nothing in here can panic for a valid request.
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn settle_pack(
         &mut self,
         buyer: &AccountId,
+        pack_usdt: u128,
         pull_id: u64,
         roll: u16,
         tier: usize,
         seed: [u8; 32],
         vrf: VrfInfo,
     ) -> PullRecord {
-        let (nft_fee, platform_fee, to_curve) = self.split_pack_price();
+        let (nft_fee, platform_fee, to_curve) = self.split_pack(pack_usdt);
         self.fees.nft_accrued = U128(self.fees.nft_accrued.0 + nft_fee);
         self.fees.platform_accrued = U128(self.fees.platform_accrued.0 + platform_fee);
 
@@ -1016,7 +1090,7 @@ impl Machine {
         self.stats.packs_opened += 1;
         self.stats.tier_counts[tier] += 1;
         self.stats.capped_pulls += u64::from(capped);
-        self.stats.total_usdt_in = U128(self.stats.total_usdt_in.0 + self.config.pack_price.0);
+        self.stats.total_usdt_in = U128(self.stats.total_usdt_in.0 + pack_usdt);
         self.stats.total_bought = U128(self.stats.total_bought.0 + bought);
         self.stats.total_payout = U128(self.stats.total_payout.0 + payout);
         let effective_bps = curve::mul_div(payout, u128::from(odds::BPS), bought) as u32;
@@ -1028,7 +1102,7 @@ impl Machine {
         let record = PullRecord {
             pull_id,
             buyer: buyer.clone(),
-            usdt_in: self.config.pack_price,
+            usdt_in: U128(pack_usdt),
             usdt_to_curve: U128(to_curve),
             roll,
             tier: self.odds[tier].name.clone(),

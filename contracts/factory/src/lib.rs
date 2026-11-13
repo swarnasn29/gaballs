@@ -32,7 +32,9 @@ pub struct VrfConfig {
 }
 
 // Fixed launch economics (docs/PARAMETERS.md, "Default").
-pub const PACK_PRICE: u128 = 10_000_000; // 10 USDT
+pub const PACK_PRICE: u128 = 10_000_000; // 10 USDT: the smallest pack
+/// The largest single pack: buyers pick any amount from PACK_PRICE to this.
+pub const MAX_PACK_PRICE: u128 = 1_000_000_000; // 1,000 USDT
 pub const VIRTUAL_USDT_RESERVE: u128 = 3_000_000_000; // 3,000 USDT
 pub const ONE_TOKEN: u128 = 1_000_000_000_000_000_000;
 pub const VAULT_SEED: u128 = 100_000_000 * ONE_TOKEN;
@@ -96,6 +98,7 @@ pub struct FactoryConfig {
     /// sha256 of the stored machine wasm (hex). Compare with `sha256sum gaballs_machine.wasm`.
     pub machine_code_sha256: Option<String>,
     pub pack_price: U128,
+    pub max_pack_price: U128,
     pub virtual_usdt_reserve: U128,
     pub vault_seed: U128,
     pub max_vault_draw_bps: u32,
@@ -205,6 +208,7 @@ impl Factory {
                 "nft_contract": self.nft_contract,
                 "platform_account": self.platform_account,
                 "pack_price": U128(PACK_PRICE),
+                "max_pack_price": U128(MAX_PACK_PRICE),
                 "virtual_usdt_reserve": U128(VIRTUAL_USDT_RESERVE),
                 "vault_seed": U128(VAULT_SEED),
                 "max_vault_draw_bps": MAX_VAULT_DRAW_BPS,
@@ -356,6 +360,7 @@ impl Factory {
             machine_code_len: self.machine_code_len,
             machine_code_sha256: self.machine_code_sha256.map(|h| h.iter().map(|b| format!("{b:02x}")).collect()),
             pack_price: U128(PACK_PRICE),
+            max_pack_price: U128(MAX_PACK_PRICE),
             virtual_usdt_reserve: U128(VIRTUAL_USDT_RESERVE),
             vault_seed: U128(VAULT_SEED),
             max_vault_draw_bps: MAX_VAULT_DRAW_BPS,

@@ -13,7 +13,8 @@ const ERR_TO_MACHINE: &str = "Tokens cannot be sent to the machine account direc
 
 #[near]
 impl FungibleTokenReceiver for Machine {
-    /// Pays for 1–5 packs. `msg` = `{"action":"open_pack","count":N}` and `amount` must equal
+    /// Pays for packs. `msg` = `{"action":"open_pack"}` opens one pack of size `amount` (from `pack_price` to
+    /// `max_pack_price`); `{"action":"open_pack","count":N}` opens N (1–5) packs and `amount` must equal
     /// `pack_price * N`. Anything invalid returns the full amount (the USDT contract refunds it).
     /// Returns "0" when the payment was accepted: the packs open when the VRF proof arrives (`pack_opened`), or the
     /// USDT is refunded (`pack_refunded`). Watch for the `pack_requested` event's `request_id`.
@@ -24,8 +25,8 @@ impl FungibleTokenReceiver for Machine {
                 env::log_str(&format!("refund {}: {reason}", amount.0));
                 PromiseOrValue::Value(amount)
             }
-            Ok(count) => {
-                self.request_pull(sender_id, amount.0, count);
+            Ok(order) => {
+                self.request_pull(sender_id, amount.0, order.count);
                 PromiseOrValue::Value(U128(0))
             }
         }

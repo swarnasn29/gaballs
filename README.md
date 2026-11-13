@@ -41,6 +41,11 @@ steps 1–4.
    1Click quote, e.g. 10.097 USDC on Base for exactly 10 USDT on NEAR mainnet. Same quote from a terminal: [§7](#7-top-up-from-any-chain-near-intents).
 7. **Squads.** **Squads** → **Gaballs Squad**: the DAO's proposals that opened 5 packs, split the prize, sold the rest and
    claimed Machine NFT fees, each linked to its transaction. Table: [Social Money: Squads](#social-money-squads).
+8. **Pick your pack size (10–1,000 USDT).** `near contract call-function as-read-only gbmax.gaballs.testnet quote_pack_amount json-args '{"amount":"1000000000"}' network-config testnet now`
+   → `bought`, `expected_payout`, `max_payout` and `max_payout_capped: true` (a 1,000 USDT Mythic on this young
+   machine is held to the 25% vault cap). `get_recent_pulls` on `gbmax.gaballs.testnet` shows pulls with `usdt_in`
+   75000000 and 37500000: one pack each, at the size paid. On the site, **Gaballs Max** has a pack-size slider; the
+   numbers under it are the same as this view. Transactions: [docs/DEPLOYMENTS.md](docs/DEPLOYMENTS.md) "Variable pack size".
 
 ## 2. Problem and mechanic
 
@@ -49,7 +54,8 @@ buying into a game with rules anyone can read:
 
 - A creator launches a coin and its gacha machine in one transaction (`gaballs.testnet` → `launch()`); the machine *is*
   the coin's contract.
-- A pack costs 10 USDT. The USDT buys the coin on the machine's own bonding curve, so every pack moves the price.
+- A pack costs 10 USDT; on machines launched from 2026-11-14 the buyer picks any size from 10 to 1,000 USDT (one
+  draw, same odds). The USDT buys the coin on the machine's own bonding curve, so every pack moves the price.
 - A verifiable random draw (OutLayer VRF, checked on-chain) picks a tier from the fixed table in §3 and multiplies the
   tokens bought. Commons (0.7×) leave 30% of their tokens in a prize vault; Rare/Epic/Mythic pulls take their extra
   from that vault, capped at 25% of it per pull.
@@ -81,7 +87,7 @@ Re-run the simulation: see [sim/README.md](sim/README.md).
 | Welcome kit (app server, not a contract) | `gaballs-welcome.testnet` | `app/src/server/welcome.ts` | Pays gas and token registration for new Google/email and MetaMask players (§5) |
 
 Code hashes and every deployment transaction: [docs/DEPLOYMENTS.md](docs/DEPLOYMENTS.md). Flagship parameters (read
-with `get_machine`): pack 10 USDT, V = 3,000 USDT, vault seed 100M, creator allocation 100M, curve 800M, cap 25%,
+with `get_machine`): pack 10 USDT (newer machines: 10–1,000 USDT, `config.max_pack_price`), V = 3,000 USDT, vault seed 100M, creator allocation 100M, curve 800M, cap 25%,
 fees 0.5% + 0.2%, VRF timeout 300 blocks.
 | OutLayer (external, not ours) | `outlayer.testnet`, project `zavodil2.testnet/vrf-ark` | [out-layer/vrf-example](https://github.com/out-layer/vrf-example) | Runs the VRF module; returns an Ed25519 signature over `vrf:{request_id}:{buyer}:{seed}` |
 
@@ -336,7 +342,8 @@ without a wallet popup, so the app only talks to Gaballs contracts:
   factory can create those). Check: open `https://gaballs.vercel.app/machine/gaballs.gaballs-official.testnet` →
   "Not a Gaballs machine".
 - **Signer allow-list.** Every signing path refuses a transaction to any other contract before signing; opening a
-  pack also requires the fixed 10 USDT price and a small storage deposit.
+  pack also requires the 10 USDT minimum, a largest pack of at most 1,000 USDT, an amount inside the machine's range
+  and a small storage deposit.
 - **Squad proposals are decoded strictly.** A friendly label ("Open 1 pack ($10)") appears only when every action
   matches what this app builds; anything else is "Unrecognised proposal" with a warning, and every card lists every
   action (contract, receiver, amount, attached NEAR) and the proposer's description.

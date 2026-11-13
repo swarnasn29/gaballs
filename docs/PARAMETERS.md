@@ -67,3 +67,31 @@ Chosen by the human on 2026-11-10: **Default**.
 
 Later (not this phase): offer Conservative and Aggressive as launch presets. Each machine still fixes its values
 at launch, with no setters afterwards.
+
+## Pack size (added 2026-11-14)
+
+Chosen by the human on 2026-11-14: a pack can be any amount from **10 USDT** (`pack_price`) to **1,000 USDT**
+(`max_pack_price`), one draw per pack, same odds, fees and vault cap. Fixed at launch like everything else
+(`get_machine().config`); only machines launched after this change have it. Older machines (including
+`gaballs.gaballs.testnet`) keep fixed 10 USDT packs; their contracts cannot be changed.
+
+What a single pack does on a **fresh** machine (V = 3,000 USDT, curve 800M, vault 100M, cap 25%). Reproduce with the
+`quote_pack_amount` view, or the one-liner below.
+
+| Pack | Tokens bought | Price impact | Best case (Mythic) | Effective best multiplier |
+| --- | --- | --- | --- | --- |
+| 10 USDT | 2.64M | +0.7% | 21.1M | 8.00× |
+| 50 USDT | 13.0M | +3.3% | 38.0M | 2.92× (vault cap) |
+| 200 USDT | 49.7M | +13.7% | 74.7M | 1.50× (vault cap) |
+| 500 USDT | 113.6M | +35.8% | 138.6M | 1.22× (vault cap) |
+| 1,000 USDT | 198.9M | +77.2% | 224.0M | 1.13× (vault cap) |
+
+In plain words: the vault cap protects the prize pool, so on a young machine a big pack mostly buys the coin and
+moves its price; the big multipliers only become reachable for big packs once the vault has grown (every Common
+adds to it). The machine page shows the exact "Best case" for the chosen size and says when the cap applies.
+
+```bash
+python -c "V=3000e6;T=800e6;vault=100e6
+for a in [10,50,200,500,1000]:
+  u=a*1e6*0.993; b=T-V*T/(V+u); mx=b+min(7*b,0.25*vault); print(a, round(b/1e6,2), round(mx/b,2))"
+```

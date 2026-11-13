@@ -9,7 +9,7 @@ import { FEATURED_MACHINE } from '@/config';
 import { factory, machine, nft, usdt, type Tx } from './contracts';
 import { createSquadTx, squadIdFor, voteTx } from './sputnik';
 import { readPackOutcome, type ExecutionOutcome, type PackResult } from './outcome';
-import { MAX_STORAGE_DEPOSIT, PACK_PRICE_UNITS, isLaunchedMachine, isMachineId, isSquadId } from '@/lib/trust';
+import { MAX_PACK_UNITS, MAX_STORAGE_DEPOSIT, PACK_PRICE_UNITS, isLaunchedMachine, isMachineId, isSquadId } from '@/lib/trust';
 
 export class UserFacingError extends Error {}
 
@@ -43,7 +43,8 @@ export function useGaballsActions() {
    * Returns what the contract reported (pack_opened events), a refund, or a failure.
    */
   const openPack = useCallback(
-    async (machineId: string, count: number): Promise<PackResult> => {
+    /** `amount` (USDT units): one pack of that size on a variable-size machine; otherwise `count` fixed packs. */
+    async (machineId: string, count: number, amount?: bigint): Promise<PackResult> => {
       const me = requireAccount();
       await requireMachine(machineId, true);
       const m = machine(machineId);
@@ -56,13 +57,18 @@ export function useGaballsActions() {
       // Every Gaballs machine charges exactly 10 USDT a pack; a different price means it is not ours.
       if (BigInt(info.config.pack_price) !== PACK_PRICE_UNITS) throw new UserFacingError('Refused: unexpected pack price.');
       if (!registered) requireSmallDeposit(bounds.min);
-      const cost = BigInt(info.config.pack_price) * BigInt(count);
+      if (amount !== undefined) {
+        const max = info.config.max_pack_price ? BigInt(info.config.max_pack_price) : PACK_PRICE_UNITS;
+        if (max > MAX_PACK_UNITS) throw new UserFacingError('Refused: unexpected largest pack size.');
+        if (amount < PACK_PRICE_UNITS || amount > max) throw new UserFacingError('That pack size is outside this machine’s range.');
+      }
+      const cost = amount ?? BigInt(info.config.pack_price) * BigInt(count);
       if (BigInt(usdtBalance) < cost) {
         throw new UserFacingError('Not enough mock USDT. Use the faucet on "My stuff" (100 USDT per hour).');
       }
       const txs: Tx[] = [];
       if (!registered) txs.push(m.storageDepositTx(me, bounds.min));
-      txs.push(usdt.openPackTx(machineId, count, info.config.pack_price));
+      txs.push(amount !== undefined ? usdt.openPackAmountTx(machineId, amount) : usdt.openPackTx(machineId, count, info.config.pack_price));
       const outcomes = await signAndSendTransactions(txs);
       return readPackOutcome(lastOutcome(outcomes), me);
     },

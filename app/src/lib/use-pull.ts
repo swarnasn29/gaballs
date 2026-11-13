@@ -116,7 +116,8 @@ export function usePull(machineId: string, onSettled?: () => void) {
   );
 
   const start = useCallback(
-    async (count: number) => {
+    /** `amount` (USDT units): one variable-size pack; otherwise `count` fixed 10 USDT packs. */
+    async (count: number, amount?: bigint) => {
       if (state.phase === 'pending') return;
       const id = ++runId.current;
       const live = () => runId.current === id;
@@ -161,7 +162,7 @@ export function usePull(machineId: string, onSettled?: () => void) {
         })();
       }
       try {
-        const result = await openPack(machineId, count);
+        const result = await openPack(machineId, count, amount);
         walletDone = true;
         clearTimeout(giveUp);
         if (!live()) return;

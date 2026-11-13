@@ -126,6 +126,15 @@ export const usdt = {
       ONE_YOCTO,
       300n,
     ),
+  /** Pays for ONE pack of `amount` USDT units (variable-size machines): msg without a count. */
+  openPackAmountTx: (machineId: AccountId, amount: bigint) =>
+    fnCall(
+      USDT_ID,
+      'ft_transfer_call',
+      { receiver_id: machineId, amount: amount.toString(), msg: JSON.stringify({ action: 'open_pack' }) },
+      ONE_YOCTO,
+      300n,
+    ),
 };
 
 // ------------------------------------------------------------------------------------------------ NFT

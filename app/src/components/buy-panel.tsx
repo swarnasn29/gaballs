@@ -1,11 +1,140 @@
 'use client';
 
 import { txUrl } from '@/config';
-import { fmtMultiplier, fmtTokens } from '@/lib/format';
+import { fmtMultiplier, fmtTokens, fmtUsdt } from '@/lib/format';
+import type { MachineView } from '@/near/types';
 import type { PullState } from '@/lib/use-pull';
 import { TierDot } from './machine-bits';
 import { PullProgress } from './pull-progress';
 import { Button, cx } from './ui';
+
+// ------------------------------------------------------------------ variable pack size
+
+const USDT = 1_000_000n;
+const BPS = 10_000n;
+/** Mythic, the best multiplier in the fixed odds table (8x). */
+const BEST_MULTIPLIER_BPS = 80_000n;
+
+export interface PackRange {
+  min: bigint;
+  max: bigint;
+}
+
+/** The machine's pack range, or null for fixed 10 USDT machines (launched before variable sizes). */
+export function packRange(v: MachineView): PackRange | null {
+  const min = BigInt(v.config.pack_price);
+  const max = v.config.max_pack_price ? BigInt(v.config.max_pack_price) : min;
+  return max > min ? { min, max } : null;
+}
+
+export const clampAmount = (a: bigint, r: PackRange) => (a < r.min ? r.min : a > r.max ? r.max : a);
+
+/** Slider position (0–1000) ↔ amount, on a log scale so 10–50 USDT gets as much room as 200–1,000. */
+const STEPS = 1000;
+function amountAt(pos: number, r: PackRange): bigint {
+  if (pos <= 0) return r.min;
+  if (pos >= STEPS) return r.max;
+  const lo = Number(r.min) / 1e6;
+  const hi = Number(r.max) / 1e6;
+  const x = lo * Math.pow(hi / lo, pos / STEPS);
+  const step = x < 100 ? 1 : x < 500 ? 5 : 10;
+  return clampAmount(BigInt(Math.round(x / step) * step) * USDT, r);
+}
+function posOf(a: bigint, r: PackRange): number {
+  const lo = Number(r.min);
+  return Math.round((Math.log(Number(a) / lo) / Math.log(Number(r.max) / lo)) * STEPS);
+}
+
+/**
+ * What one pack of `amount` buys right now: the contract's own maths (curve.rs `tokens_out`, rounding for the contract;
+ * `quote_pack_amount` returns the same numbers) on the curve and vault from get_machine().
+ */
+export function quoteAmount(v: MachineView, amount: bigint) {
+  const fee = (x: bigint, bps: number) => (x * BigInt(bps)) / BPS;
+  const toCurve = amount - fee(amount, v.config.nft_fee_bps) - fee(amount, v.config.platform_fee_bps);
+  const k = BigInt(v.config.virtual_usdt_reserve) + BigInt(v.curve_usdt_reserve);
+  const t = BigInt(v.curve_tokens);
+  const denom = k + toCurve;
+  const bought = t - (k * t + denom - 1n) / denom;
+  // Prices scaled by 10^36 (USDT has 6 decimals, the token 18): 10^18 alone rounds them to a few digits.
+  const priceBefore = (k * 10n ** 36n) / t;
+  const priceAfter = ((k + toCurve) * 10n ** 36n) / (t - bought);
+  const impactPct = priceBefore > 0n ? Number(((priceAfter - priceBefore) * 100_000n) / priceBefore) / 1000 : 0;
+  const rawMax = (bought * BEST_MULTIPLIER_BPS) / BPS;
+  const room = (BigInt(v.vault) * BigInt(v.config.max_vault_draw_bps)) / BPS;
+  const maxPayout = bought + (rawMax - bought < room ? rawMax - bought : room);
+  return { bought, impactPct, maxPayout, capped: rawMax > maxPayout };
+}
+
+const PRESETS = [10n, 50n, 200n, 500n, 1000n];
+
+function PackSizePicker({ min, max, amount, setAmount, view }: PackRange & { amount: bigint; setAmount: (a: bigint) => void; view: MachineView }) {
+  const r = { min, max };
+  const q = quoteAmount(view, amount);
+  const presets = PRESETS.map((p) => p * USDT).filter((p) => p >= min && p <= max);
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-baseline justify-between gap-2">
+        <label htmlFor="pack-size" className="font-semibold">
+          Pack size
+        </label>
+        <span className="font-display text-3xl font-bold text-grape" data-testid="pack-size">
+          {fmtUsdt(amount)}
+        </span>
+      </div>
+      <input
+        id="pack-size"
+        type="range"
+        min={0}
+        max={STEPS}
+        step={1}
+        value={posOf(amount, r)}
+        onChange={(e) => setAmount(amountAt(Number(e.target.value), r))}
+        aria-valuetext={`${Number(amount) / 1e6} USDT`}
+        className="h-11 w-full cursor-pointer accent-grape"
+      />
+      <div className="flex flex-wrap gap-1.5">
+        {presets.map((p) => (
+          <button
+            key={p.toString()}
+            type="button"
+            aria-pressed={amount === p}
+            onClick={() => setAmount(p)}
+            className={cx(
+              'min-h-11 flex-1 rounded-full px-2 font-display text-sm font-semibold ring-2',
+              amount === p ? 'bg-grape text-white ring-grape' : 'bg-blush text-grape ring-lilac',
+            )}
+          >
+            {fmtUsdt(p)}
+          </button>
+        ))}
+      </div>
+      <dl className="grid grid-cols-2 gap-x-3 gap-y-1 rounded-2xl bg-blush p-3 text-sm">
+        <dt>You buy</dt>
+        <dd className="text-right font-bold">≈ {fmtTokens(q.bought)} tokens</dd>
+        <dt>Price impact</dt>
+        <dd className={cx('text-right font-bold', q.impactPct >= 10 && 'text-warn')}>+{q.impactPct.toFixed(q.impactPct < 1 ? 2 : 1)}%</dd>
+        <dt>Best case (Mythic)</dt>
+        <dd className="text-right font-bold" data-testid="pack-max">
+          {fmtTokens(q.maxPayout)} tokens
+        </dd>
+      </dl>
+      <p className="text-xs text-plum">
+        One pack, one draw on the same odds; every tier multiplies what this pack buys.
+        {q.capped && (
+          <>
+            {' '}
+            <span className="font-semibold text-warn">
+              At this size a Mythic is held to the vault cap ({view.config.max_vault_draw_bps / 100}% of the vault), so it pays
+              less than 8×.
+            </span>
+          </>
+        )}{' '}
+        Same maths as the contract&apos;s <code>quote_pack_amount</code> view on {view.machine}.
+      </p>
+    </div>
+  );
+}
 
 /**
  * Count picker + the accessible "Open pack" button (same action as dragging the crank) + the outcome text.
@@ -20,10 +149,13 @@ export function BuyPanel({
   onOpen,
   onReset,
   onRefund,
+  size,
 }: {
   account: string;
   count: number;
   setCount: (n: number) => void;
+  /** Variable-size machines: the pack-size slider replaces the 1–5 count picker. */
+  size?: PackRange & { amount: bigint; setAmount: (a: bigint) => void; view: MachineView };
   state: PullState;
   capsuleOut: boolean;
   onOpen: () => void;
@@ -37,7 +169,13 @@ export function BuyPanel({
 
   return (
     <div className="flex flex-col gap-3">
-      <h2 className="text-2xl font-bold">Open packs</h2>
+      <h2 className="text-2xl font-bold">{size ? 'Open a pack' : 'Open packs'}</h2>
+      {size ? (
+        <fieldset disabled={pending} className="disabled:opacity-60">
+          <legend className="sr-only">Pack size</legend>
+          <PackSizePicker {...size} />
+        </fieldset>
+      ) : (
       <fieldset className="flex flex-wrap items-center gap-2" disabled={pending}>
         <legend className="sr-only">Number of packs</legend>
         {[1, 2, 3, 4, 5].map((n) => (
@@ -56,6 +194,7 @@ export function BuyPanel({
         ))}
         <span className="ml-1 whitespace-nowrap font-bold">= {count * 10} USDT</span>
       </fieldset>
+      )}
 
       {timedOut ? (
         <div className="flex flex-col gap-3 rounded-3xl bg-tier-mythic/20 p-4 ring-2 ring-warn" role="alert">
@@ -75,7 +214,13 @@ export function BuyPanel({
         </Button>
       ) : (
         <Button onClick={onOpen} disabled={!account || pending}>
-          {pending ? 'Turning the crank…' : account ? `Open ${count} pack${count > 1 ? 's' : ''}` : 'Connect a wallet to play'}
+          {pending
+            ? 'Turning the crank…'
+            : !account
+              ? 'Connect a wallet to play'
+              : size
+                ? `Open a ${fmtUsdt(size.amount)} pack`
+                : `Open ${count} pack${count > 1 ? 's' : ''}`}
         </Button>
       )}
       {!finished && !timedOut && account && !pending && <p className="text-xs text-plum">Or drag the machine&apos;s crank a full turn.</p>}

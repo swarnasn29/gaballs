@@ -19,8 +19,10 @@ const MACHINE_ID = new RegExp(`^[a-z0-9]{2,12}\\.${escape(FACTORY_ID)}$`);
 /** `<name>.<sputnik factory>`: Sputnik DAO names are lowercase letters, digits and dashes. */
 const SQUAD_ID = new RegExp(`^[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?\\.${escape(SPUTNIK_FACTORY)}$`);
 
-/** Every machine charges 10 USDT a pack (fixed in the factory). */
+/** Every machine's smallest pack is 10 USDT (fixed in the factory). */
 export const PACK_PRICE_UNITS = 10_000_000n;
+/** The largest single pack the factory allows (1,000 USDT); a machine claiming more is refused. */
+export const MAX_PACK_UNITS = 1_000_000_000n;
 /** Storage registration on a token costs ~0.00125 NEAR; anything above 0.01 NEAR is refused as suspicious. */
 export const MAX_STORAGE_DEPOSIT = 10n ** 22n;
 

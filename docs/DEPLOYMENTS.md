@@ -54,6 +54,43 @@ already use 270 Tgas, see below).
 Each 0x-signed transaction is an `rlp_execute` call on the player's own account; the Gaballs calls run inside it, so
 the events above are in the same transaction.
 
+## Variable pack size: factory update + Gaballs Max ($GBMAX), 2026-11-13 UTC
+
+A pack can now be any amount from 10 to 1,000 USDT (one draw, same odds; docs/PARAMETERS.md "Pack size"). The factory
+was redeployed (no re-init: its state did not change) and the new machine code uploaded; machines launched from here on
+get the range. Earlier machines, including `gaballs.gaballs.testnet`, keep fixed 10 USDT packs: they have no keys and
+cannot be changed. Reproduce: `scripts/build-wasm.ps1` (or `.sh`), `ROOT=gaballs.testnet ./scripts/deploy-testnet.sh`,
+`./scripts/launch-gbmax.sh`.
+
+| Account | Contract | Code SHA-256 (hex) | Access keys |
+| --- | --- | --- | --- |
+| [`gaballs.testnet`](https://testnet.nearblocks.io/address/gaballs.testnet) | Factory (passes `max_pack_price` = 1,000 USDT) | `e90f782bc8e3dc41ea7551bc6f15c513e20584db8f43e4bcde6d319f6452facb` | 1 full-access (locked in Phase 7) |
+| machine code stored in the factory | Machine + token (variable pack size) | `f8a79babcb536ce40464f64ea462f2835ab4726f73466a227899277aa214cde5` | — |
+| [`gbmax.gaballs.testnet`](https://testnet.nearblocks.io/address/gbmax.gaballs.testnet) | Machine + token GBMAX ("Gaballs Max") | `f8a79babcb536ce40464f64ea462f2835ab4726f73466a227899277aa214cde5` (= factory `machine_code_sha256`) | **0 — no keys** |
+| `usdt.gaballs.testnet`, `nft.gaballs.testnet` | unchanged (same hashes as below; redeployed byte-identical by the script) | `6343ee95…`, `afb4e0ee…` | 1 full-access each |
+
+| Step | Transaction |
+| --- | --- |
+| redeploy factory to gaballs.testnet (no init) | [CXsFj3FY…](https://testnet.nearblocks.io/txns/CXsFj3FYFRHFTCTuh8rsnC757zA6UndWUmtHLtmdvKTp) |
+| factory.set_machine_code(gaballs_machine.wasm) | [FBwj5Fcb…](https://testnet.nearblocks.io/txns/FBwj5FcbZRVr3pjiR6tHkGLEDyCEBTv963qqwv8nhToM) |
+| factory.set_vrf_config (same OutLayer project and key as before) | [GYyfQnRK…](https://testnet.nearblocks.io/txns/GYyfQnRKPUuGgkDxnBuiw3EZYBNWwBDMbsiKgkGLJiTa) |
+| (redeploy mock USDT / NFT, byte-identical) | [GuEFbWEk…](https://testnet.nearblocks.io/txns/GuEFbWEkhB644NEKQZdTEf4QyX7wsDYwccTLBhGAF2Vi), [9mAyZXdK…](https://testnet.nearblocks.io/txns/9mAyZXdKVzE2QCBTpLyhhZp8qGW34aL5wR9eYdXZMPvj) |
+| testnet NEAR for the launch: gaballs-welcome.testnet → gaballs.testnet, 6 NEAR | [DNBAXFRq…](https://testnet.nearblocks.io/txns/DNBAXFRqdmzvMzgydHhAtSsAH36hg6Sr1XuYD3mBXTzc) |
+| gaballs.testnet launches GBMAX (attached 4.312 NEAR) | [9TEj99e6…](https://testnet.nearblocks.io/txns/9TEj99e6yP7zDwY8cVGkzZ3tst5b1jKydExFMnnnvas1) |
+| check: gbmax.gaballs.testnet has 0 access keys; code = factory machine_code_sha256; pack range 10000000 to 1000000000 | — |
+| buyer1 opens ONE pack of 100 USDT → OutLayer run failed → **refunded in full** (`pack_refunded`) | [EvEkc9M8…](https://testnet.nearblocks.io/txns/EvEkc9M8JwWuQgJyByUjuQ2wGGFL8fqE1SxkJSAEaqoY) |
+| buyer2 opens ONE pack of 37.5 USDT → OutLayer run failed → **refunded in full** | [6qxocprV…](https://testnet.nearblocks.io/txns/6qxocprVcpd5b75VJ8PS1w2rRewU4Ur2CUfw5QXam8YU) |
+| retry: 100 USDT and 37.5 USDT → OutLayer failed again → both refunded in full | [2FnjELuu…](https://testnet.nearblocks.io/txns/2FnjELuuXcRTN3KtCEkrTsSB22R3hkaaPy2LHEkrhuno), [64x3ZAGf…](https://testnet.nearblocks.io/txns/64x3ZAGfuPBpZamUbMy1YGUGgxgqZijtYiLjcK4dW38c) |
+| health check: one 10 USDT pack on gaballs.gaballs.testnet → pull #62 opened (OutLayer back) | [EbYdyos7…](https://testnet.nearblocks.io/txns/EbYdyos7VPQ9hfQAAfdxNZCJ3iiihHzKx3m4NBt3DLws) |
+| buyer1: 10 USDT as `{"action":"open_pack","count":1}` → pull #0 opened | [AqcNQMwz…](https://testnet.nearblocks.io/txns/AqcNQMwz9y7XQUNv4vy5YcfHeZ7yVKQqnMrzskAE5jm3) |
+| buyer1: 10 USDT as `{"action":"open_pack"}` → pull #1 opened | [FkUQQDjj…](https://testnet.nearblocks.io/txns/FkUQQDjjie2QQXt7SDA5usYFfQ3eQUZRLGYEMfo2oLB8) |
+| buyer1 opens ONE pack of **75 USDT** → pull #2, Common 0.7×, `usdt_in` 75000000, bought 19.13M, payout 13.39M | [Dd6akMzR…](https://testnet.nearblocks.io/txns/Dd6akMzRB7XXavkNuAauAybBFfDwJp9u29BUwqJCtxFe) |
+| buyer2 opens ONE pack of **37.5 USDT** → pull #3, Rare 1.25×, `usdt_in` 37500000, bought 9.22M, payout 11.53M | [C9rxJJo3…](https://testnet.nearblocks.io/txns/C9rxJJo3kcTwC6t3KXtNMKN7jYNikZEhnixDvJnv4XtS) |
+| after: packs_opened 4, total_usdt_in 132.5 USDT, vault 105.01M, refunds 4 | — |
+
+The four refunds are OutLayer's intermittent failures (its run returned "Execution promise failed"); the contract
+did what it promises: no pack, full USDT back in the same transaction.
+
 ## Current: flagship GABALLS + Squads, 2026-11-11/12 UTC
 
 **`gaballs.gaballs.testnet` ($GABALLS) is the single flagship** for individuals and squads. It runs the last machine

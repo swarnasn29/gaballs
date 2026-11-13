@@ -491,6 +491,47 @@ async fn vrf_valid_forged_failed_and_timeout_on_chain() -> TestResult {
 }
 
 #[tokio::test]
+async fn variable_pack_size_on_chain() -> TestResult {
+    let env = setup(wasm("gaballs_machine/gaballs_machine.wasm")).await?;
+    let cfg: Value = env.view(&env.factory, "get_config", json!({})).await;
+    assert_eq!(cfg["pack_price"], "10000000");
+    assert_eq!(cfg["max_pack_price"], "1000000000");
+    let machine = env.launch().await;
+    fund_buyer(&env, &machine).await;
+    let m: Value = env.view(&machine, "get_machine", json!({})).await;
+    assert_eq!(m["config"]["max_pack_price"], "1000000000", "the factory launches machines with the 1,000 USDT max");
+
+    let one = json!({ "action": "open_pack" }).to_string();
+    // 37.5 USDT: one pack of exactly that size.
+    let amount: u128 = 37_500_000;
+    let q: Value = env.view(&machine, "quote_pack_amount", json!({ "amount": amount.to_string() })).await;
+    env.queue_vrf(&machine, &env.buyer, Vrf::Valid).await;
+    let usdt0 = env.usdt_balance(&env.buyer).await;
+    let out = env
+        .call(&env.buyer, &env.usdt, "ft_transfer_call", json!({ "receiver_id": machine, "amount": amount.to_string(), "msg": one }), NearToken::from_yoctonear(1))
+        .await;
+    assert!(out.clone().into_result().is_ok(), "{:?}", out.clone().into_result().err());
+    let opened = events(&out, "pack_opened");
+    assert_eq!(opened.len(), 1);
+    assert_eq!(opened[0]["usdt_in"], amount.to_string());
+    assert_eq!(opened[0]["bought"], q["bought"]);
+    assert_eq!(usdt0 - env.usdt_balance(&env.buyer).await, amount);
+    let held: String = env.view(&machine, "ft_balance_of", json!({ "account_id": env.buyer })).await;
+    assert_eq!(held, opened[0]["payout"].as_str().unwrap());
+
+    // 9.99 USDT is below the minimum: the USDT comes straight back and nothing opens.
+    let usdt1 = env.usdt_balance(&env.buyer).await;
+    let out = env
+        .call(&env.buyer, &env.usdt, "ft_transfer_call", json!({ "receiver_id": machine, "amount": "9990000", "msg": one }), NearToken::from_yoctonear(1))
+        .await;
+    assert!(out.clone().into_result().is_ok());
+    assert!(events(&out, "pack_opened").is_empty() && events(&out, "pack_requested").is_empty());
+    assert_eq!(env.usdt_balance(&env.buyer).await, usdt1);
+    println!("37.5 USDT pack: bought {} payout {} tier {}; 9.99 USDT refunded", opened[0]["bought"], opened[0]["payout"], opened[0]["tier"]);
+    Ok(())
+}
+
+#[tokio::test]
 async fn sell_back_on_chain() -> TestResult {
     let env = setup(wasm("gaballs_machine/gaballs_machine.wasm")).await?;
     let machine = env.launch().await;

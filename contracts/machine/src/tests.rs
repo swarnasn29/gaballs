@@ -10,6 +10,7 @@ use near_sdk::{NearToken, PromiseOrValue, PromiseResult, RuntimeFeesConfig, test
 
 const PACK: u128 = 10_000_000; // 10 USDT
 const USDT: u128 = 1_000_000;
+const MAX_PACK: u128 = 1_000 * USDT; // 1,000 USDT
 
 fn acc(s: &str) -> AccountId {
     s.parse().unwrap()
@@ -78,6 +79,7 @@ fn default_args() -> LaunchArgs {
         nft_contract: acc("nft.gaballs.testnet"),
         platform_account: acc("gaballs.testnet"),
         pack_price: U128(PACK),
+        max_pack_price: Some(U128(MAX_PACK)),
         virtual_usdt_reserve: U128(3_000 * USDT),
         vault_seed: U128(100_000_000 * ONE_TOKEN),
         max_vault_draw_bps: 2_500,
@@ -373,7 +375,7 @@ fn vault_cap_is_respected_during_a_mythic_streak() {
         // Force a Mythic: call the settlement step directly, skipping the VRF roll (on_vrf_result normally
         // advances the nonce, so do that here too).
         m.pull_nonce = i + 1;
-        let r = m.settle_pack(&buyer(0), i, 9_999, odds::MYTHIC, [0; 32], no_vrf());
+        let r = m.settle_pack(&buyer(0), PACK, i, 9_999, odds::MYTHIC, [0; 32], no_vrf());
         let draw = r.payout.0 - r.bought.0;
         assert!(draw <= vault_before / 4, "pull {i} drew more than 25% of the vault");
         assert_eq!(r.vault_after.0, vault_before - draw);
@@ -547,7 +549,7 @@ fn best_multiplier_is_the_effective_one_after_the_cap() {
     for i in 0..3u64 {
         ctx(usdt(), i);
         m.pull_nonce = i + 1;
-        m.settle_pack(&buyer(0), i, 9_999, odds::MYTHIC, [0; 32], no_vrf());
+        m.settle_pack(&buyer(0), PACK, i, 9_999, odds::MYTHIC, [0; 32], no_vrf());
     }
     // First Mythic is uncapped (8x); the 3rd is capped, so the best stays 8x from pull 0.
     let v = m.get_machine();
@@ -979,4 +981,124 @@ fn vrf_proof_naming_a_different_signer_with_the_right_seed_is_accepted_and_pays_
     assert!(m.get_recent_pulls().iter().all(|r| r.buyer == dao && r.vrf_alpha == alpha));
     // Supply invariant with the DAO as the only holder besides the creator (check_invariants only knows buyer(i)).
     assert_eq!(m.curve_tokens + m.vault + bal(&m, &creator()) + bal(&m, &dao), TOTAL_SUPPLY);
+}
+
+// ---------------------------------------------------------------- variable pack size
+
+const ONE_PACK: &str = r#"{"action":"open_pack"}"#;
+
+#[test]
+fn variable_pack_settles_at_the_amount_paid() {
+    let mut m = launch_with_buyers(1);
+    for (i, amount) in [PACK, 37_500_000, 250 * USDT, MAX_PACK].into_iter().enumerate() {
+        let quote = m.quote_pack_amount(U128(amount));
+        let before = bal(&m, &buyer(0));
+        let in_before = m.stats.total_usdt_in.0;
+        assert_eq!(pay(&mut m, &buyer(0), amount, ONE_PACK, i as u64), 0, "accepted");
+        let pull = &m.get_recent_pulls()[0];
+        assert_eq!(pull.usdt_in.0, amount);
+        assert_eq!(pull.bought, quote.bought, "quote matches the tokens bought");
+        assert_eq!(pull.usdt_to_curve.0, amount - curve::bps_of(amount, NFT_FEE_BPS) - curve::bps_of(amount, PLATFORM_FEE_BPS));
+        assert_eq!(bal(&m, &buyer(0)) - before, pull.payout.0);
+        assert_eq!(m.stats.total_usdt_in.0 - in_before, amount);
+        check_invariants(&m, 1);
+    }
+    assert_eq!(m.stats.packs_opened, 4);
+}
+
+#[test]
+fn variable_pack_outside_the_range_is_refunded_in_full() {
+    let mut m = launch_with_buyers(1);
+    for amount in [1, PACK - 1, MAX_PACK + 1, 10 * MAX_PACK] {
+        assert_eq!(pay(&mut m, &buyer(0), amount, ONE_PACK, 1), amount, "amount {amount}");
+    }
+    assert_eq!((m.pull_nonce, m.request_nonce), (0, 0));
+    assert_eq!(m.stats.total_usdt_in.0, 0);
+    check_invariants(&m, 1);
+}
+
+#[test]
+fn one_big_pack_buys_the_same_as_many_small_ones() {
+    // The curve is path independent: one 100 USDT pack buys what ten 10 USDT packs buy (to rounding).
+    let m = launch_with_buyers(1);
+    let big = m.quote_pack_amount(U128(10 * PACK)).bought.0;
+    let to_curve = PACK - curve::bps_of(PACK, NFT_FEE_BPS) - curve::bps_of(PACK, PLATFORM_FEE_BPS);
+    let (v, mut r, mut t, mut small) = (m.config.virtual_usdt_reserve.0, m.curve_usdt, m.curve_tokens, 0u128);
+    for _ in 0..10 {
+        let b = curve::tokens_out(v, r, t, to_curve);
+        r += to_curve;
+        t -= b;
+        small += b;
+    }
+    assert!(big >= small && big - small < 10, "big {big} vs 10 small {small}");
+}
+
+#[test]
+fn big_mythic_is_held_to_the_vault_cap_and_the_quote_says_so() {
+    let mut m = launch_with_buyers(1);
+    let q = m.quote_pack_amount(U128(MAX_PACK));
+    assert!(q.max_payout_capped, "a 1,000 USDT Mythic on a fresh machine is limited by the 25% vault cap");
+    assert_eq!(q.max_payout.0, q.bought.0 + curve::bps_of(m.vault, 2_500));
+    let small = m.quote_pack_amount(U128(PACK));
+    assert!(!small.max_payout_capped);
+    assert_eq!(small.max_payout.0, curve::bps_of(small.bought.0, 80_000));
+
+    let vault_before = m.vault;
+    ctx(usdt(), 1);
+    let pull = m.settle_pack(&buyer(0), MAX_PACK, 0, 9_999, odds::MYTHIC, [0; 32], no_vrf());
+    m.pull_nonce = 1;
+    m.stats.total_usdt_in = U128(MAX_PACK);
+    assert_eq!(pull.tier, "Mythic");
+    assert_eq!(pull.usdt_in.0, MAX_PACK);
+    assert!(pull.capped);
+    assert_eq!(pull.payout, q.max_payout);
+    assert_eq!(m.vault, vault_before - curve::bps_of(vault_before, 2_500));
+    check_invariants(&m, 1);
+}
+
+#[test]
+fn fixed_count_packs_still_work_on_a_variable_machine() {
+    let mut m = launch_with_buyers(1);
+    assert_eq!(pay(&mut m, &buyer(0), 3 * PACK, &pack_msg(3), 1), 0);
+    assert_eq!(m.stats.packs_opened, 3);
+    assert!(m.get_recent_pulls().iter().all(|p| p.usdt_in.0 == PACK));
+    // `count` with a non-multiple amount is still refunded, even inside the variable range.
+    assert_eq!(pay(&mut m, &buyer(0), 25 * USDT, &pack_msg(1), 2), 25 * USDT);
+    check_invariants(&m, 1);
+}
+
+#[test]
+fn without_max_pack_price_only_fixed_packs_are_accepted() {
+    ctx(acc("gaballs.testnet"), 0);
+    let mut m = Machine::new(LaunchArgs { max_pack_price: None, ..default_args() });
+    m.token.internal_register_account(&buyer(0));
+    assert_eq!(m.config.max_pack_price.0, PACK);
+    assert_eq!(pay(&mut m, &buyer(0), 20 * USDT, ONE_PACK, 1), 20 * USDT);
+    assert_eq!(pay(&mut m, &buyer(0), PACK, ONE_PACK, 2), 0);
+    assert_eq!(m.stats.packs_opened, 1);
+}
+
+#[test]
+#[should_panic(expected = "max_pack_price must be at least pack_price")]
+fn max_pack_below_min_is_rejected() {
+    ctx(acc("gaballs.testnet"), 0);
+    Machine::new(LaunchArgs { max_pack_price: Some(U128(PACK - 1)), ..default_args() });
+}
+
+#[test]
+fn invariants_hold_with_random_pack_sizes() {
+    const BUYERS: usize = 3;
+    let mut m = launch_with_buyers(BUYERS);
+    let mut rng = Rng(77);
+    for call in 0..400u64 {
+        let who = buyer((rng.next() % BUYERS as u64) as usize);
+        let amount = rng.range(PACK, MAX_PACK);
+        assert_eq!(pay(&mut m, &who, amount, ONE_PACK, call), 0);
+        check_invariants(&m, BUYERS);
+        if call % 50 == 0 {
+            m.sweep_fees();
+            check_invariants(&m, BUYERS);
+        }
+    }
+    assert_eq!(m.stats.packs_opened, 400);
 }

@@ -22,7 +22,10 @@ export interface MachineConfig {
   nft_contract: AccountId;
   platform_account: AccountId;
   nft_token_id: string;
+  /** Smallest pack (and the per-pack price of a fixed `count` payment), USDT units. */
   pack_price: U128;
+  /** Largest single pack, USDT units. Absent on machines launched before variable pack sizes (fixed 10 USDT). */
+  max_pack_price?: U128;
   virtual_usdt_reserve: U128;
   curve_inventory: U128;
   vault_seed: U128;

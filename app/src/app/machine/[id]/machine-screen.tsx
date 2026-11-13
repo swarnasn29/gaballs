@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { BuyPanel } from '@/components/buy-panel';
+import { BuyPanel, clampAmount, packRange } from '@/components/buy-panel';
 import { MachineStage } from '@/components/machine/stage';
 import { PullFeed } from '@/components/pull-feed';
 import { RevealDialog } from '@/components/reveal/reveal-dialog';
@@ -29,6 +29,8 @@ export function MachineScreen({ id }: { id: string }) {
   }, [view, pulls]);
   const pull = usePull(id, refreshAll);
   const [count, setCount] = useState(1);
+  // Variable-size machines: one pack of any amount from pack_price to max_pack_price (USDT units).
+  const [amount, setAmount] = useState(10_000_000n);
   const [capsuleOut, setCapsuleOut] = useState(false);
   const [revealOpen, setRevealOpen] = useState(false);
 
@@ -66,10 +68,12 @@ export function MachineScreen({ id }: { id: string }) {
     }
   }, [account, id, revealOpen, shownPulls, refreshInbox]);
 
+  const sizeRange = view.data ? packRange(view.data) : null;
   const open = useCallback(() => {
     setCapsuleOut(false);
-    void pull.start(count);
-  }, [pull, count]);
+    if (sizeRange) void pull.start(1, clampAmount(amount, sizeRange));
+    else void pull.start(count);
+  }, [pull, count, amount, sizeRange]);
   const reset = useCallback(() => {
     setCapsuleOut(false);
     setRevealOpen(false);
@@ -168,6 +172,7 @@ export function MachineScreen({ id }: { id: string }) {
             account={pull.account}
             count={count}
             setCount={setCount}
+            size={v && sizeRange ? { ...sizeRange, amount: clampAmount(amount, sizeRange), setAmount, view: v } : undefined}
             state={pull.state}
             capsuleOut={capsuleOut}
             onOpen={open}
