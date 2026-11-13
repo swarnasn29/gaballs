@@ -18,25 +18,25 @@ const MOOD: Record<TierName, { title: string; line: string; backdrop: string; gu
   Common: {
     title: 'Common',
     line: 'A sweet little treat.',
-    backdrop: 'rgba(43, 24, 64, 0.62)',
+    backdrop: 'rgba(27, 58, 99, 0.62)',
     gumball: 150,
   },
   Rare: {
     title: 'Rare!',
     line: 'Ooh, shiny! One in five.',
-    backdrop: 'radial-gradient(circle at 50% 35%, rgba(95,184,236,0.55), rgba(43,24,64,0.75) 70%)',
+    backdrop: 'radial-gradient(circle at 50% 35%, rgba(95,184,236,0.55), rgba(27, 58, 99,0.75) 70%)',
     gumball: 170,
   },
   Epic: {
     title: 'EPIC!',
     line: 'The whole machine is glowing. One in twenty-five.',
-    backdrop: 'radial-gradient(circle at 50% 35%, rgba(241,124,195,0.7), rgba(43,24,64,0.85) 72%)',
+    backdrop: 'radial-gradient(circle at 50% 35%, rgba(241,124,195,0.7), rgba(27, 58, 99,0.85) 72%)',
     gumball: 190,
   },
   Mythic: {
     title: 'MYTHIC!!',
     line: 'Legendary: one in a hundred. You earned a soulbound certificate.',
-    backdrop: 'radial-gradient(circle at 50% 35%, rgba(255,201,60,0.95), rgba(241,124,195,0.75) 45%, rgba(43,24,64,0.92) 80%)',
+    backdrop: 'radial-gradient(circle at 50% 35%, rgba(255,201,60,0.95), rgba(241,124,195,0.75) 45%, rgba(27, 58, 99,0.92) 80%)',
     gumball: 210,
   },
 };
@@ -141,7 +141,7 @@ export function RevealDialog({
 
   const revealed = stage === 'revealed';
   const showFx = revealed && !reduced;
-  const backdrop = stage === 'closed' || stage === 'cracking' || stage === 'summary' ? 'rgba(43, 24, 64, 0.62)' : mood.backdrop;
+  const backdrop = stage === 'closed' || stage === 'cracking' || stage === 'summary' ? 'rgba(27, 58, 99, 0.62)' : mood.backdrop;
   const value = tokensToUsdt(pull.payout, pull.price_after);
 
   return (

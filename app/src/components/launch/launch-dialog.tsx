@@ -29,7 +29,7 @@ export type LaunchState =
     }
   | { s: 'failed'; message: string; txHash?: string };
 
-const GUMBALLS = ['#563791', '#b593c7', '#d5b8e3', '#fee7fa', tierColor.Mythic, '#563791', '#b593c7', '#fee7fa'];
+const GUMBALLS = ['#2e78c7', '#7cc4f2', '#afdff5', '#ddf0ff', tierColor.Mythic, '#2e78c7', '#7cc4f2', '#ddf0ff'];
 
 /** The machine "being built": flat machine with gumballs dropping into the dome. */
 function Building({ reduced }: { reduced: boolean | null }) {
@@ -78,8 +78,8 @@ export function LaunchDialog({ state, onClose }: { state: LaunchState; onClose: 
   if (state.s === 'idle') return null;
   const busy = state.s === 'signing' || state.s === 'confirming';
   const backdrop = live
-    ? 'radial-gradient(circle at 50% 30%, rgba(255,201,60,0.85), rgba(181,147,199,0.8) 45%, rgba(43,24,64,0.9) 80%)'
-    : 'rgba(43, 24, 64, 0.65)';
+    ? 'radial-gradient(circle at 50% 30%, rgba(255,201,60,0.85), rgba(124, 196, 242,0.8) 45%, rgba(27, 58, 99,0.9) 80%)'
+    : 'rgba(27, 58, 99, 0.65)';
 
   return (
     <div
@@ -108,7 +108,7 @@ export function LaunchDialog({ state, onClose }: { state: LaunchState; onClose: 
               transition={reduced ? { duration: 0.2 } : { type: 'spring', stiffness: 260, damping: 12 }}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={art.machine.flat} alt="" width={150} className="max-w-[40vw] drop-shadow-[0_10px_20px_rgba(43,24,64,0.35)]" />
+              <img src={art.machine.flat} alt="" width={150} className="max-w-[40vw] drop-shadow-[0_10px_20px_rgba(27, 58, 99,0.35)]" />
             </motion.div>
           </div>
         )}

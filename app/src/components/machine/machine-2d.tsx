@@ -12,7 +12,8 @@ import type { StagePhase } from './shared';
 // Geometry of art.machine.flat (viewBox 300×420): dome centre (150,140) r≈118, crank knob (150,318), chute (224,382).
 const VB = { w: 300, h: 420 };
 const BALL = 22;
-const BALL_COLORS = ['#563791', '#563791', '#b593c7', '#b593c7', '#d5b8e3', '#fee7fa', '#fee7fa'];
+// Pastel gumball mix from the brand: blues plus mint, pink and lavender.
+const BALL_COLORS = ['#2e78c7', '#7cc4f2', '#7fdcb0', '#f6a8cf', '#b9a0ea', '#7cc4f2', '#7fdcb0'];
 
 function layoutBalls(n: number) {
   const out: { x: number; y: number; color: string }[] = [];

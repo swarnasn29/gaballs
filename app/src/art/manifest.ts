@@ -15,7 +15,10 @@ export const art = {
     bubble: '/art/background/bubble.svg',
   },
   brand: {
-    logo: '/art/brand/logo.svg',
+    /** The character's head in a baby-blue tile (rendered from brand/; 96 px, shown at 36). */
+    logo: '/art/brand/icon.png',
+    /** "Gaballs" wordmark, trimmed (368x96; shown at 24-30 px high). */
+    wordmark: '/art/brand/wordmark.png',
   },
   characters: {
     mascot: '/art/characters/mascot.svg',
@@ -47,7 +50,7 @@ export const art = {
 
 /** Placeholder tier colours (also used by the 3D machine until real textures arrive). */
 export const tierColor: Record<TierName, string> = {
-  Common: '#b593c7',
+  Common: '#a78bdb',
   Rare: '#5fb8ec',
   Epic: '#f17cc3',
   Mythic: '#ffc93c',

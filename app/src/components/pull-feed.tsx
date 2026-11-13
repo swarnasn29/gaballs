@@ -56,8 +56,8 @@ function Feed({ pulls, account, limit = 12 }: { pulls: PullRecord[] | undefined;
             <motion.li
               key={p.pull_id}
               layout
-              initial={{ opacity: 0, x: -60, backgroundColor: 'rgba(254,231,250,1)' }}
-              animate={{ opacity: 1, x: 0, backgroundColor: 'rgba(254,231,250,0)' }}
+              initial={{ opacity: 0, x: -60, backgroundColor: 'rgba(221, 240, 255,1)' }}
+              animate={{ opacity: 1, x: 0, backgroundColor: 'rgba(221, 240, 255,0)' }}
               exit={{ opacity: 0 }}
               transition={{ type: 'spring', stiffness: 260, damping: 24, backgroundColor: { duration: 2.5 } }}
               className={ROW}

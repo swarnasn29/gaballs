@@ -25,7 +25,7 @@ function Modal({ children, onBackdrop, labelledBy }: { children: React.ReactNode
   }, [onBackdrop]);
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 py-10 sm:items-center" role="dialog" aria-modal="true" aria-labelledby={labelledBy}>
-      <div className="fixed inset-0 bg-[rgba(43,24,64,0.65)]" onClick={onBackdrop} />
+      <div className="fixed inset-0 bg-[rgba(27, 58, 99,0.65)]" onClick={onBackdrop} />
       <div className="relative w-full max-w-md rounded-[2rem] bg-white p-6 text-ink shadow-chunky ring-4 ring-white" aria-live="polite">
         {children}
       </div>

@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice">
-<defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8f6bb8"/><stop offset=".45" stop-color="#b593c7"/><stop offset=".8" stop-color="#d5b8e3"/><stop offset="1" stop-color="#fee7fa"/></linearGradient>
-<radialGradient id="glow" cx=".7" cy=".2" r=".5"><stop offset="0" stop-color="#fee7fa" stop-opacity=".55"/><stop offset="1" stop-color="#fee7fa" stop-opacity="0"/></radialGradient></defs>
+<defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5aa9e6"/><stop offset=".45" stop-color="#7cc4f2"/><stop offset=".8" stop-color="#afdff5"/><stop offset="1" stop-color="#ddf0ff"/></linearGradient>
+<radialGradient id="glow" cx=".7" cy=".2" r=".5"><stop offset="0" stop-color="#ddf0ff" stop-opacity=".55"/><stop offset="1" stop-color="#ddf0ff" stop-opacity="0"/></radialGradient></defs>
 <rect width="1440" height="900" fill="url(#g)"/><rect width="1440" height="900" fill="url(#glow)"/>
 <g fill="#fff" opacity=".55"><ellipse cx="160" cy="760" rx="260" ry="90"/><ellipse cx="420" cy="800" rx="240" ry="80"/><ellipse cx="1060" cy="790" rx="300" ry="95"/><ellipse cx="1340" cy="760" rx="220" ry="85"/></g></svg>

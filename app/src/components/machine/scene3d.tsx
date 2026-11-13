@@ -48,14 +48,14 @@ const CHUTE_Y = 0.42;
 const TRAY_POS = new THREE.Vector3(0, 0.33, 1.06);
 
 const PALETTE = {
-  grape: '#563791',
-  plum: '#6e4386',
-  lavender: '#b593c7',
-  lilac: '#d5b8e3',
-  blush: '#fee7fa',
+  grape: '#2e78c7',
+  plum: '#2e5a86',
+  lavender: '#7cc4f2',
+  lilac: '#afdff5',
+  blush: '#ddf0ff',
   gold: '#ffc93c',
-  ink: '#2b1840',
-  sky: '#cdb3e0',
+  ink: '#1b3a63',
+  sky: '#bfe3fa',
 };
 
 function lathe(points: [number, number][], segments: number, samples = 48) {
@@ -88,7 +88,7 @@ function useMaterials(quality: Quality) {
     });
     const plum = purple.clone();
     plum.color = new THREE.Color(PALETTE.plum);
-    const chrome = new THREE.MeshPhysicalMaterial({ color: '#f6f1fb', metalness: 1, roughness: 0.07, clearcoat: 1, envMapIntensity: 1.5 });
+    const chrome = new THREE.MeshPhysicalMaterial({ color: '#f1f7fd', metalness: 1, roughness: 0.07, clearcoat: 1, envMapIntensity: 1.5 });
     const dark = new THREE.MeshPhysicalMaterial({ color: PALETTE.ink, roughness: 0.45, clearcoat: 0.5 });
     const floor = new THREE.MeshPhysicalMaterial({ color: PALETTE.lilac, roughness: 0.4, clearcoat: 0.8 });
     const knob = new THREE.MeshPhysicalMaterial({ color: PALETTE.blush, roughness: 0.15, clearcoat: 1, sheen: 0.4 });
@@ -319,7 +319,7 @@ function MachineBody({
 const rimMaterial = new THREE.ShaderMaterial({
   transparent: true,
   depthWrite: false,
-  uniforms: { color: { value: new THREE.Color('#fbefff') } },
+  uniforms: { color: { value: new THREE.Color('#f2f9ff') } },
   vertexShader: `
     varying vec3 vN; varying vec3 vV;
     void main() {
@@ -369,7 +369,7 @@ function Dome({ mats, quality }: { mats: Mats; quality: Quality }) {
         clearcoatRoughness={0.02}
         envMapIntensity={1.2}
         color="#ffffff"
-        attenuationColor="#fbf3ff"
+        attenuationColor="#f3f9ff"
         attenuationDistance={4}
       />
     </mesh>
@@ -447,7 +447,8 @@ function Gumballs({
     const mesh = meshRef.current;
     if (!mesh) return;
     const r = rng(42);
-    const choices = [PALETTE.grape, PALETTE.grape, PALETTE.grape, PALETTE.lavender, PALETTE.lavender, PALETTE.lilac, PALETTE.blush];
+    // Pastel gumball mix from the brand (brand/README.md): blues plus mint, pink and lavender, so the globe reads as candy.
+    const choices = [PALETTE.grape, PALETTE.lavender, '#7fdcb0', '#f6a8cf', '#b9a0ea', PALETTE.lavender, '#7fdcb0', '#f6a8cf'];
     const goldAt = Math.floor(instances.length * 0.6);
     const c = new THREE.Color();
     for (let i = 0; i < instances.length; i++) {
@@ -825,8 +826,8 @@ function FpsProbe({ onFps }: { onFps?: (fps: number) => void }) {
 const studioRoom = (() => {
   const g = new THREE.SphereGeometry(1, 32, 24);
   const pos = g.attributes.position;
-  const low = new THREE.Color('#3b2160');
-  const high = new THREE.Color('#e9def3');
+  const low = new THREE.Color('#1f3f6b');
+  const high = new THREE.Color('#e3f2fd');
   const c = new THREE.Color();
   const colors = new Float32Array(pos.count * 3);
   for (let i = 0; i < pos.count; i++) {
@@ -851,8 +852,8 @@ function Studio({ high }: { high: boolean }) {
       <Lightformer form="rect" intensity={3} position={[0, 6, 0]} rotation-x={Math.PI / 2} scale={[10, 6, 1]} />
       <Lightformer form="rect" intensity={2.2} position={[-5, 2, 2]} rotation-y={Math.PI / 2} scale={[2, 7, 1]} />
       <Lightformer form="rect" intensity={2.2} position={[5, 2, 2]} rotation-y={-Math.PI / 2} scale={[2, 7, 1]} />
-      <Lightformer form="rect" intensity={1.0} color="#fee7fa" position={[0, 2, 7]} scale={[8, 3, 1]} />
-      <Lightformer form="rect" intensity={0.8} color="#b593c7" position={[0, -3, 0]} rotation-x={-Math.PI / 2} scale={[10, 10, 1]} />
+      <Lightformer form="rect" intensity={1.0} color="#ddf0ff" position={[0, 2, 7]} scale={[8, 3, 1]} />
+      <Lightformer form="rect" intensity={0.8} color="#7cc4f2" position={[0, -3, 0]} rotation-x={-Math.PI / 2} scale={[10, 10, 1]} />
       <Lightformer form="ring" intensity={2.6} color="#ffffff" position={[2.5, 3, 4]} scale={1.2} />
     </Environment>
   );
@@ -944,9 +945,9 @@ function SceneCanvas({
       style={{ touchAction: 'none', visibility: hidden ? 'hidden' : 'visible' }}
     >
       <CameraRig view={props.view ?? 'default'} dragging={dragging} />
-      <hemisphereLight args={['#fee7fa', '#b593c7', 0.5]} />
+      <hemisphereLight args={['#ddf0ff', '#7cc4f2', 0.5]} />
       <directionalLight position={[3, 5, 4]} intensity={1.2} />
-      <directionalLight position={[-4, 3, -2]} intensity={0.5} color="#d5b8e3" />
+      <directionalLight position={[-4, 3, -2]} intensity={0.5} color="#afdff5" />
       <Studio high={high} />
       <Machine {...props} dragging={dragging} />
       <ContactShadows
@@ -956,7 +957,7 @@ function SceneCanvas({
         opacity={0.5}
         far={1.2}
         resolution={high ? 512 : 256}
-        color="#563791"
+        color="#2e78c7"
         frames={1}
       />
       <FpsProbe onFps={props.onFps} />

@@ -148,7 +148,7 @@ export function PrivyRoot({ children }: PropsWithChildren) {
       appId={PRIVY_APP_ID}
       config={{
         loginMethods: ['google', 'email'],
-        appearance: { accentColor: '#6b3fa0', theme: 'light', showWalletLoginFirst: false, landingHeader: 'Play Gaballs' },
+        appearance: { accentColor: '#2e78c7', theme: 'light', showWalletLoginFirst: false, landingHeader: 'Play Gaballs' },
         // Only the NEAR wallet (created in Bridge); no Ethereum/Solana embedded wallets, no wallet confirmation UIs.
         embeddedWallets: { ethereum: { createOnLogin: 'off' }, solana: { createOnLogin: 'off' }, showWalletUIs: false },
       }}

@@ -55,8 +55,9 @@ export function Header() {
     <header className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-3 px-4 pt-4 sm:px-6">
       <Link href="/" className="flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1.5 shadow-chunky sm:gap-2 sm:px-3">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={art.brand.logo} alt="" width={36} height={36} />
-        <span className="font-display text-xl font-bold text-grape sm:text-2xl">Gaballs</span>
+        <img src={art.brand.logo} alt="" width={36} height={36} className="rounded-lg" />
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={art.brand.wordmark} alt="Gaballs" width={92} height={24} className="h-6 w-auto sm:h-[30px]" />
         <span className="rounded-full bg-grape px-2 py-0.5 text-[11px] font-bold uppercase text-white">{NETWORK}</span>
       </Link>
 

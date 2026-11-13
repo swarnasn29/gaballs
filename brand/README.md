@@ -16,7 +16,8 @@ Main blue is the blue gumball measured from the character art (`#AFDFF5`); the o
 | Sky | `#DDF0FF` | Page background |
 | Baby blue | `#AFDFF5` | Main brand colour, tiles, highlights |
 | Bubble | `#7CC4F2` | Secondary highlights |
-| Ocean | `#2E78C7` | Buttons and the wordmark fill (white text on it passes contrast) |
+| Ocean | `#2E78C7` | Wordmark fill, illustrations |
+| UI blue | `#2667AD` | Site buttons, links and blue text (passes WCAG AA on white and on Sky) |
 | Ink navy | `#1B3A63` | Text, outlines, sticker edges |
 | Cloud | `#FFFFFF` | Cards, sticker borders |
 | Mint / Lavender / Pink / Gold | `#ADEDC8` / `#C1A7E6` / `#F9C2DF` / `#FFE58A` | Gumball accents, tier colours |

@@ -1,17 +1,19 @@
 @import "tailwindcss";
 
 /* Gaballs theme. Text that carries numbers, odds or the risk notice always sits on a solid card (bg-card),
-   never directly on the sky. ink on white = 15.6:1, grape on white = 8.4:1, white on grape = 8.4:1 (WCAG AA+). */
+   never directly on the sky. Baby-blue palette (brand/README.md); measured contrast: ink #1b3a63 on white 11.5:1,
+   plum #2e5a86 on white 7.2:1 and on blush 6.2:1, grape #2667ad on white 5.8:1 and on blush 5.0:1, white on grape
+   5.8:1 (all WCAG AA for normal text). The brand's brighter Ocean #2E78C7 is for the logo and art only. */
 @theme {
-  --color-grape: #563791;
-  --color-plum: #6e4386;
-  --color-lavender: #b593c7;
-  --color-lilac: #d5b8e3;
-  --color-blush: #fee7fa;
-  --color-ink: #2b1840;
+  --color-grape: #2667ad;
+  --color-plum: #2e5a86;
+  --color-lavender: #7cc4f2;
+  --color-lilac: #afdff5;
+  --color-blush: #ddf0ff;
+  --color-ink: #1b3a63;
   --color-card: #ffffff;
 
-  --color-tier-common: #b593c7;
+  --color-tier-common: #a78bdb;
   --color-tier-rare: #5fb8ec;
   --color-tier-epic: #f17cc3;
   --color-tier-mythic: #ffc93c;

@@ -82,7 +82,7 @@ export function Confetti({ pieces = 160, duration = 4500 }: { pieces?: number; d
     };
     resize();
     window.addEventListener('resize', resize);
-    const colors = [tierColor.Mythic, '#563791', '#b593c7', '#fee7fa', '#f17cc3', '#5fb8ec', '#ffffff'];
+    const colors = [tierColor.Mythic, '#2e78c7', '#7cc4f2', '#ddf0ff', '#f17cc3', '#5fb8ec', '#ffffff'];
     const w = () => canvas.width;
     const h = () => canvas.height;
     const parts = Array.from({ length: pieces }, () => ({
