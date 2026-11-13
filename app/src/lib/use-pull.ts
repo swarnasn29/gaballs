@@ -5,7 +5,7 @@
 // get_recent_pulls by request id).
 //
 // Phase 5 machines settle on verifiable randomness: the payment transaction records a pending pull and asks OutLayer
-// for a VRF proof; the proof arrives in a later receipt (about a minute on testnet). Until the contract has settled
+// for a VRF proof; the proof arrives in a later receipt (usually ~10 s on testnet; NEAR gives up after ~2 minutes and the machine refunds). Until the contract has settled
 // or refunded the request, the state stays "pending" and the machine keeps wobbling. Pending pulls are read back from
 // the contract after a reload (`resume`), and pulls that settled while the player was away can be opened later
 // (`openSettled`); see src/lib/pull-tracker.ts.
@@ -20,7 +20,7 @@ import { type ReadyRequest, trackRequest } from './pull-tracker';
 
 export type PullState =
   | { phase: 'idle' }
-  /** `vrf`: a Phase 5 machine — the capsule opens once the VRF proof is verified (about a minute after paying). */
+  /** `vrf`: a Phase 5 machine — the capsule opens once the VRF proof is verified (usually ~10 s after paying). */
   /**
    * `paidAt`: when the payment was seen on-chain (ms epoch; null while the wallet is still working). `requestId` once
    * known.
@@ -47,7 +47,13 @@ function friendly(e: unknown): string {
 }
 
 const VRF_REFUND_MESSAGE =
-  'The randomness proof did not arrive or did not verify, so the machine refunded your USDT. Nothing was bought.';
+  'OutLayer, the randomness service, did not answer in time, so the machine refunded your USDT automatically. Nothing was bought; try again.';
+
+/** The contract's refund reason in plain words (it records a short technical reason, e.g. "VRF result is not valid JSON"). */
+function refundMessage(reason: string): string {
+  if (/VRF|OutLayer|proof|signature/i.test(reason)) return VRF_REFUND_MESSAGE;
+  return `The machine sent your USDT back (${reason}). Nothing was bought.`;
+}
 
 export function usePull(machineId: string, onSettled?: () => void) {
   const { account, openPack, refundExpired } = useGaballsActions();
@@ -161,7 +167,7 @@ export function usePull(machineId: string, onSettled?: () => void) {
         if (!live()) return;
         if (result.kind === 'opened') setState({ phase: 'opened', txHash: result.txHash, pulls: result.pulls });
         else if (result.kind === 'refunded')
-          setState({ phase: 'refunded', txHash: result.txHash, message: `The machine sent your USDT back: ${result.reason}.` });
+          setState({ phase: 'refunded', txHash: result.txHash, message: refundMessage(result.reason) });
         else if (result.kind === 'requested') {
           setState((s) => (s.phase === 'pending' ? { ...s, vrf: true } : s));
           await waitForSettlement(result.requestId, result.txHash, live);

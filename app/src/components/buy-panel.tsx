@@ -71,7 +71,7 @@ export function BuyPanel({
         </div>
       ) : finished ? (
         <Button variant="secondary" onClick={onReset}>
-          Play again
+          {state.phase === 'refunded' ? 'Try again' : 'Play again'}
         </Button>
       ) : (
         <Button onClick={onOpen} disabled={!account || pending}>
@@ -86,8 +86,8 @@ export function BuyPanel({
           <p>
             {state.vrf
               ? state.slow
-                ? 'Still waiting for the randomness proof. If none arrives within about 5 minutes, you can take your USDT back.'
-                : 'Waiting for your payment and a verifiable randomness proof from OutLayer (usually about a minute). The contract checks the proof before opening your capsule.'
+                ? 'Still waiting for the randomness proof. If OutLayer has not answered about 2 minutes after you paid, the machine refunds your USDT automatically.'
+                : 'Waiting for your payment and a verifiable randomness proof from OutLayer (usually about 10 seconds). The contract checks the proof before opening your capsule.'
               : state.slow
                 ? 'Still waiting for the wallet or the network… The machine keeps going until the contract answers.'
                 : 'Waiting for the transaction. The result comes from the contract, not from the animation.'}

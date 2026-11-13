@@ -1,6 +1,7 @@
 'use client';
 
-// Progress while a VRF pull is in flight: Paid ✓ → Generating verifiable randomness (~1 min) → Reveal.
+// Progress while a VRF pull is in flight: Paid ✓ → Generating verifiable randomness (usually ~10 s) → Reveal.
+// If OutLayer does not answer, NEAR stops waiting after ~2 minutes and the machine refunds the USDT automatically.
 // Purely informational: the steps follow what the contract reports (payment seen on-chain, then settled); the timer
 // and the gentle animation never decide anything.
 
@@ -9,7 +10,14 @@ import { useEffect, useState } from 'react';
 import { useNearWallet } from '@/providers/near-provider';
 import { cx } from './ui';
 
-const TYPICAL_SECONDS = 65;
+/** Measured on testnet (Nov 2026): a proof usually settles 7–9 s after paying. */
+const TYPICAL_SECONDS = 10;
+/**
+ * NEAR gives up waiting for OutLayer after ~200 blocks (about 2 minutes); the machine then refunds the USDT in the
+ * same transaction. Measured: failed proofs always refunded 205 blocks (115–126 s) after paying.
+ */
+const AUTO_REFUND_SECONDS = 125;
+const SLOW_SECONDS = 20;
 
 function useElapsed(since: number | null) {
   const [now, setNow] = useState(() => Date.now());
@@ -34,7 +42,7 @@ export function PullProgress({ paidAt, count, compact }: { paidAt: number | null
   const { via } = useNearWallet();
   const steps = [
     { label: paid ? 'Paid' : via === 'google' ? 'Paying' : 'Paying in your wallet', state: paid ? 'done' : 'active' },
-    { label: 'Generating verifiable randomness (~1 min)', state: paid ? 'active' : 'todo' },
+    { label: 'Generating verifiable randomness (usually ~10 s)', state: paid ? 'active' : 'todo' },
     { label: 'Reveal', state: 'todo' },
   ] as const;
 
@@ -86,14 +94,22 @@ export function PullProgress({ paidAt, count, compact }: { paidAt: number | null
                 />
               </div>
               <p className="mt-1 text-xs tabular-nums text-plum">
-                {mmss(elapsed)} · usually about a minute{count && count > 1 ? ` for all ${count} packs` : ''}
+                {mmss(elapsed)} · usually about 10 seconds{count && count > 1 ? ` for all ${count} packs` : ''}
               </p>
             </div>
           </div>
-          <p className="text-sm font-semibold text-grape">This minute is what makes the result provably fair.</p>
-          {elapsed > 120 && (
-            <p className="text-sm text-plum">
-              Taking longer than usual. If no proof arrives within 5 minutes of paying, you can take your USDT back here.
+          <p className="text-sm font-semibold text-grape">This wait is what makes the result provably fair.</p>
+          {elapsed > SLOW_SECONDS && (
+            <p className="rounded-2xl bg-white p-3 text-sm text-ink ring-2 ring-lilac" data-testid="slow-proof">
+              {elapsed < AUTO_REFUND_SECONDS ? (
+                <>
+                  OutLayer, the randomness service, is slow to answer right now. If it has not answered about 2 minutes
+                  after you paid, the machine <b>refunds your USDT automatically</b>: nothing is lost, and you can try
+                  again. Automatic refund in about <b className="tabular-nums">{mmss(AUTO_REFUND_SECONDS - elapsed)}</b>.
+                </>
+              ) : (
+                <>Any moment now: OutLayer did not answer, so the machine is refunding your USDT.</>
+              )}
             </p>
           )}
           <p className="text-xs text-plum">

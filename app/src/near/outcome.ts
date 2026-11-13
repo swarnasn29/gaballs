@@ -33,7 +33,7 @@ export function events(outcome: ExecutionOutcome): NepEvent[] {
 
 export type PackResult =
   | { kind: 'opened'; txHash: string; pulls: PullRecord[] }
-  /** Phase 5 machines: payment accepted, the VRF proof arrives in a later receipt (about a minute). */
+  /** Phase 5 machines: payment accepted, the VRF proof arrives in a later receipt (usually ~10 s). */
   | { kind: 'requested'; txHash: string; requestId: number }
   | { kind: 'refunded'; txHash: string; reason: string }
   | { kind: 'failed'; txHash?: string; reason: string };
