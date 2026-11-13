@@ -413,3 +413,14 @@ its whole balance there).
 | --- | --- | --- | --- |
 | 2026-11-11 | `gaballs-topup1.testnet` | [9h3qZi46…](https://testnet.nearblocks.io/txns/9h3qZi46rNPQk38Wj7T4UwNDEGB8SuQdmvGEFyaBptfC) | [4XFUPHHo…](https://testnet.nearblocks.io/txns/4XFUPHHoMXnxfVDFXwURBEyBDUZz2uuN8fb3EfGcuQU8) |
 | 2026-11-11 | `gaballs-topup2.testnet` | [FRjm8XzA…](https://testnet.nearblocks.io/txns/FRjm8XzARf4Dj2JdX7mSYSuVctxQQLdSgS4KfbyYrzxS) | [Aw3nUWkW…](https://testnet.nearblocks.io/txns/Aw3nUWkWBbMtYVkQFU3pQJBimUWB22Q73uh3shVBTXBY) |
+
+Before judging, 2026-11-14: the welcome kit and the flagship machine (which pays OutLayer's VRF fee from its own NEAR)
+were topped up the same way, each helper deleted with the target as beneficiary. After: `gaballs-welcome.testnet`
+27.45 NEAR free (about 50 kits), `gaballs.gaballs.testnet` 10.71 NEAR free. (`gaballs-topup4.testnet` already
+existed under someone else's key, so it was skipped.)
+
+| Date | Helper account | Created (faucet) | Deleted → beneficiary |
+| --- | --- | --- | --- |
+| 2026-11-14 | `gaballs-topup5.testnet` | [7fLV7UeB…](https://testnet.nearblocks.io/txns/7fLV7UeBkGeemwk1VWkHyFgbpohcFL9DtCwUzjkbG7Cf) | [EqkWKSn2…](https://testnet.nearblocks.io/txns/EqkWKSn2krm6PSztPQtMgdzoXQSbnPPb4hZXp1ZvB6KU) → gaballs-welcome.testnet |
+| 2026-11-14 | `gaballs-kit-topup7.testnet` | [CDc49VfE…](https://testnet.nearblocks.io/txns/CDc49VfEnucch8bE8akAAHf42ARLz7BFYwLHdCv4Hjq8) | [9tiY3xdN…](https://testnet.nearblocks.io/txns/9tiY3xdNiziuCexybADWkhFff3BPkFxMyNAKZjnCsuBt) → gaballs-welcome.testnet |
+| 2026-11-14 | `gaballs-topup6.testnet` | [3fTyoQCd…](https://testnet.nearblocks.io/txns/3fTyoQCdejTxQ8d5ritfxPEjJ29kmtwwkSUmCH9VyPdY) | [F3TtKsEq…](https://testnet.nearblocks.io/txns/F3TtKsEqJn5hte6Ne8J6WActRH2bo4gq7dmEE5M5XMMP) → gaballs.gaballs.testnet |
