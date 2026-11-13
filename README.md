@@ -160,7 +160,7 @@ Limits, all checked before anything is sent (`app/src/server/welcome.ts`):
 - only implicit (64 hex) or `0x` accounts; once per account (an account already registered on mock USDT is refused,
   checked on-chain, plus a cache mark and an in-flight lock against parallel requests);
 - a Google/email (implicit) account needs a **verified Privy login**: the browser sends its Privy access token, the
-  server checks it (ES256, issuer `privy.io`, audience = our Privy app id, against Privy's public verification key;
+  server checks it (ES256, issuer `privy.io`, audience = our Privy app id, against the public keys Privy publishes for the app;
   `app/src/server/privy-auth.ts`), and each Privy user gets one kit ever. Anyone can make up account ids, so the
   login, not the account id, is what is counted;
 - MetaMask (`0x`) accounts have no login to check, so they get their own share: at most 4 kits per day;
