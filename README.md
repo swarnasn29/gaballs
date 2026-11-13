@@ -158,9 +158,23 @@ registration on mock USDT and on $GABALLS: three transactions, shown to the play
 
 Limits, all checked before anything is sent (`app/src/server/welcome.ts`):
 - only implicit (64 hex) or `0x` accounts; once per account (an account already registered on mock USDT is refused,
-  checked on-chain, plus a cache mark against races);
-- 3 kits per IP per day and 15 per day overall (Vercel Runtime Cache; per region, best effort);
+  checked on-chain, plus a cache mark and an in-flight lock against parallel requests);
+- a Google/email (implicit) account needs a **verified Privy login**: the browser sends its Privy access token, the
+  server checks it (ES256, issuer `privy.io`, audience = our Privy app id, against Privy's public verification key;
+  `app/src/server/privy-auth.ts`), and each Privy user gets one kit ever. Anyone can make up account ids, so the
+  login, not the account id, is what is counted;
+- MetaMask (`0x`) accounts have no login to check, so they get their own share: at most 4 kits per day;
+- 3 kits per IP per day and 15 per day overall (Vercel Runtime Cache; per region, best effort; Vercel sets the
+  client IP header itself, so it cannot be faked);
 - the kit switches itself off with a friendly message when the account holds less than 1 NEAR.
+
+Checks: `curl -s -X POST https://gaballs.vercel.app/api/welcome -H 'content-type: application/json' -d '{"accountId":"<any 64 hex>"}'`
+→ `401` "Log in with Google or email to get the welcome kit."
+
+Security headers on every response (`app/next.config.ts`): `X-Frame-Options: DENY` and
+`Content-Security-Policy: frame-ancestors 'none'` (no site can frame Gaballs, which matters because Google/email
+players sign without a popup), `X-Content-Type-Options: nosniff`, `Referrer-Policy`, `Permissions-Policy`.
+Check: `curl -sI https://gaballs.vercel.app/ | grep -i frame`.
 
 Why 0.5 NEAR: a pack attaches 300 Tgas, and NEAR holds that gas at a pessimistic price (~0.30 NEAR) before running;
 most is refunded, a pack really costs ~0.002–0.01 NEAR.

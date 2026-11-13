@@ -182,7 +182,7 @@ export function NearProvider({ children }: PropsWithChildren) {
           onEthereum={() => void connectWallet(ETHEREUM_WALLETS)}
         />
       )}
-      {google && !wallet && <WelcomeKitDialog accountId={google} />}
+      {google && !wallet && <WelcomeKitDialog accountId={google} getToken={privy.getAccessToken} />}
       {/^0x[0-9a-f]{40}$/.test(walletAccountId) && <WelcomeKitDialog accountId={walletAccountId} />}
     </NearContext.Provider>
   );

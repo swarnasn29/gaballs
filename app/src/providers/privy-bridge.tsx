@@ -61,6 +61,8 @@ export interface PrivyBridge {
   accountId: string;
   login: () => void;
   logout: () => Promise<void>;
+  /** The Privy access token, proving the login to our own server (the welcome kit). Null when logged out. */
+  getAccessToken: () => Promise<string | null>;
   signAndSend: (txs: Tx[]) => Promise<ExecutionOutcome[]>;
 }
 
@@ -70,6 +72,7 @@ const disabled: PrivyBridge = {
   accountId: '',
   login: () => {},
   logout: async () => {},
+  getAccessToken: async () => null,
   signAndSend: async () => {
     throw new Error('Google/email login is not configured');
   },
@@ -79,7 +82,7 @@ const PrivyBridgeContext = createContext<PrivyBridge>(disabled);
 export const usePrivyBridge = () => useContext(PrivyBridgeContext);
 
 function Bridge({ children }: PropsWithChildren) {
-  const { ready, authenticated, user } = usePrivy();
+  const { ready, authenticated, user, getAccessToken } = usePrivy();
   const { login } = useLogin();
   const { logout } = useLogout();
   const { createWallet } = useCreateWallet();
@@ -106,6 +109,7 @@ function Bridge({ children }: PropsWithChildren) {
       accountId,
       login: () => login({ loginMethods: ['google', 'email'] }),
       logout,
+      getAccessToken,
       signAndSend: async (txs) => {
         if (!account) throw new Error('Log in first');
         const out: ExecutionOutcome[] = [];
@@ -128,7 +132,7 @@ function Bridge({ children }: PropsWithChildren) {
         return out;
       },
     };
-  }, [ready, accountId, login, logout, signRawHash]);
+  }, [ready, accountId, login, logout, getAccessToken, signRawHash]);
 
   return <PrivyBridgeContext.Provider value={value}>{children}</PrivyBridgeContext.Provider>;
 }

@@ -28,6 +28,22 @@ const nextConfig: NextConfig = {
     "ts",
   ],
   env: { NEXT_PUBLIC_DEV_SIGNER: devSigner ? "1" : "0" },
+  // Security headers on every page and API route. No site may embed Gaballs in a frame (clickjacking: Google/email
+  // players sign without a wallet popup, so a hidden frame must not be able to steer their clicks).
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: [
+          { key: "X-Frame-Options", value: "DENY" },
+          { key: "Content-Security-Policy", value: "frame-ancestors 'none'" },
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=()" },
+        ],
+      },
+    ];
+  },
   turbopack: {
     root,
     resolveAlias: {

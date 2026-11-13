@@ -36,6 +36,11 @@ const YOCTO = 10n ** 24n;
 export const KIT_NEAR = YOCTO / 2n; // 0.5 NEAR
 export const KITS_PER_DAY = 15;
 export const KITS_PER_IP_PER_DAY = 3;
+/**
+ * MetaMask (0x) kits get their own small share of the day: anyone can make up 0x addresses, and there is no login to
+ * check, so they must not be able to use up the kits meant for Google/email players.
+ */
+export const KITS_0X_PER_DAY = 4;
 export const OFF_BELOW_NEAR = 1;
 
 
@@ -84,7 +89,7 @@ export interface KitStatus {
   message?: string;
   balanceNear: number;
   kitsToday: number;
-  limits: { kitNear: number; perDay: number; perIpPerDay: number; offBelowNear: number };
+  limits: { kitNear: number; perDay: number; perIpPerDay: number; metamaskPerDay: number; googleNeedsLogin: boolean; offBelowNear: number };
 }
 
 export async function kitStatus(): Promise<KitStatus> {
@@ -92,6 +97,8 @@ export async function kitStatus(): Promise<KitStatus> {
     kitNear: Number(KIT_NEAR / 10n ** 21n) / 1000,
     perDay: KITS_PER_DAY,
     perIpPerDay: KITS_PER_IP_PER_DAY,
+    metamaskPerDay: KITS_0X_PER_DAY,
+    googleNeedsLogin: true,
     offBelowNear: OFF_BELOW_NEAR,
   };
   const kitsToday = await count(`day:${today()}`);
@@ -121,27 +128,52 @@ export interface KitResult {
   txs: { what: string; hash: string }[];
 }
 
-/** Sends the kit, or throws a KitError with a friendly message. */
-export async function sendKit(accountId: string, ip: string): Promise<KitResult> {
+/** Accounts and Privy users with a kit being sent right now on this server instance (closes the parallel-request gap). */
+const inFlight = new Set<string>();
+
+/**
+ * Sends the kit, or throws a KitError with a friendly message.
+ * `privyUser` is the verified Privy user id (src/server/privy-auth.ts) or null. A Google/email (implicit, 64-hex)
+ * account only gets a kit with a verified Privy login, and each Privy user gets one kit ever: anyone can make up
+ * account ids, so the login (not the account id) is what the limit counts.
+ */
+export async function sendKit(accountId: string, ip: string, privyUser: string | null): Promise<KitResult> {
   if (!isWelcomeAccount(accountId))
     throw new KitError('The welcome kit is for new Google/email and MetaMask accounts only.', 400);
+  const google = IMPLICIT.test(accountId);
+  if (google && !privyUser) throw new KitError('Log in with Google or email to get the welcome kit.', 401);
 
   const status = await kitStatus();
   if (!status.on) throw new KitError(status.message ?? 'Welcome kit unavailable.', 503);
 
-  const registered = await view<StorageBalance | null>(USDT_ID, 'storage_balance_of', { account_id: accountId });
-  if (registered) throw new KitError('This account already got its welcome kit.', 409);
-  if (await cache().get(`acct:${accountId}`)) throw new KitError('This account already got its welcome kit.', 409);
+  const keys = [`acct:${accountId}`, ...(privyUser ? [`user:${privyUser}`] : [])];
+  if (keys.some((k) => inFlight.has(k))) throw new KitError('Your welcome kit is already on its way.', 409);
+  keys.forEach((k) => inFlight.add(k));
+  try {
+    const registered = await view<StorageBalance | null>(USDT_ID, 'storage_balance_of', { account_id: accountId });
+    if (registered) throw new KitError('This account already got its welcome kit.', 409);
+    for (const k of keys) if (await cache().get(k)) throw new KitError('This account already got its welcome kit.', 409);
 
-  const ipKey = `ip:${ip}:${today()}`;
-  if ((await count(ipKey)) >= KITS_PER_IP_PER_DAY)
-    throw new KitError('Too many welcome kits from this network today. Try again tomorrow.', 429);
+    const ipKey = `ip:${ip}:${today()}`;
+    if ((await count(ipKey)) >= KITS_PER_IP_PER_DAY)
+      throw new KitError('Too many welcome kits from this network today. Try again tomorrow.', 429);
+    const dayOx = `day0x:${today()}`;
+    if (!google && (await count(dayOx)) >= KITS_0X_PER_DAY)
+      throw new KitError("Today's MetaMask welcome kits are all given out. Come back tomorrow (UTC), or sign in with Google/email.", 503);
 
-  // Mark first (before sending) so a second request for the same account in parallel is refused.
-  await cache().set(`acct:${accountId}`, 1, { ttl: 30 * 86_400 });
-  await bump(ipKey);
-  await bump(`day:${today()}`);
+    // Mark first (before sending) so a later request for the same account or login is refused.
+    for (const k of keys) await cache().set(k, 1, { ttl: 30 * 86_400 });
+    await bump(ipKey);
+    await bump(`day:${today()}`);
+    if (!google) await bump(dayOx);
+    return await deliver(accountId);
+  } finally {
+    keys.forEach((k) => inFlight.delete(k));
+  }
+}
 
+/** The three kit transactions (the checks in sendKit have passed). */
+async function deliver(accountId: string): Promise<KitResult> {
   const [usdtBounds, tokenBounds] = await Promise.all([
     view<StorageBalanceBounds>(USDT_ID, 'storage_balance_bounds'),
     view<StorageBalanceBounds>(FEATURED_MACHINE, 'storage_balance_bounds'),

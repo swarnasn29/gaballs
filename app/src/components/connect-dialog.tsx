@@ -156,7 +156,7 @@ interface KitTx {
 type KitState = { s: 'checking' } | { s: 'sending' } | { s: 'sent'; txs: KitTx[] } | { s: 'error'; message: string } | { s: 'none' };
 
 /** Shown once for a new Google/email account: sends and shows the welcome kit. Renders nothing for known accounts. */
-export function WelcomeKitDialog({ accountId }: { accountId: string }) {
+export function WelcomeKitDialog({ accountId, getToken }: { accountId: string; getToken?: () => Promise<string | null> }) {
   const [state, setState] = useState<KitState>({ s: 'checking' });
   const started = useRef('');
 
@@ -168,9 +168,11 @@ export function WelcomeKitDialog({ accountId }: { accountId: string }) {
         const registered = await view<object | null>(USDT_ID, 'storage_balance_of', { account_id: accountId });
         if (registered) return setState({ s: 'none' });
         setState({ s: 'sending' });
+        // Google/email players prove their login with their Privy token (the server allows one kit per login).
+        const token = getToken ? await getToken() : null;
         const res = await fetch('/api/welcome', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
           body: JSON.stringify({ accountId }),
         });
         const body = (await res.json()) as { txs?: KitTx[]; error?: string };
@@ -181,7 +183,7 @@ export function WelcomeKitDialog({ accountId }: { accountId: string }) {
         setState({ s: 'error', message: e instanceof Error ? e.message : 'The welcome kit failed.' });
       }
     })();
-  }, [accountId]);
+  }, [accountId, getToken]);
 
   if (state.s === 'checking' || state.s === 'none') return null;
   const close = state.s === 'sending' ? undefined : () => setState({ s: 'none' });
