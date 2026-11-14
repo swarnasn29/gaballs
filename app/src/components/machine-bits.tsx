@@ -71,15 +71,24 @@ export function vaultHealth(m: MachineView) {
 
 /**
  * Which generation a machine runs. Machines are keyless, so an older one can never be upgraded:
- * - `current`: the code the factory launches today (verifiable randomness, sell-back, squads);
+ * - `current`: verifiable randomness, sell-back and squads: the code the factory launches today, or an earlier code
+ *   with the same features (SQUAD_READY_CODE);
  * - `vrf-solo`: the first VRF version — its proof check required the payer to sign, so squads (DAOs) cannot pull;
  * - `v1`: block randomness and no sell-back.
  */
 export type MachineGeneration = 'current' | 'vrf-solo' | 'v1';
 
+/**
+ * Machine code hashes that have VRF, sell-back and squad support but are no longer the factory's code. The factory
+ * moved on to the variable-pack-size code (docs/DEPLOYMENTS.md, "Variable pack size"); the flagship
+ * gaballs.gaballs.testnet runs this one (docs/DEPLOYMENTS.md, "Current: flagship GABALLS + Squads").
+ */
+const SQUAD_READY_CODE = new Set(['a43447c8f8323d0643fc70e0cb6108b5be63b14083f805e40ea7e6d81a025935']);
+
 export function generationOf(view: MachineView | null, codeSha256: string | null, factoryCodeSha256: string | null) {
   if (!view?.config.vrf) return 'v1' as const;
-  return codeSha256 && codeSha256 === factoryCodeSha256 ? ('current' as const) : ('vrf-solo' as const);
+  if (codeSha256 && (codeSha256 === factoryCodeSha256 || SQUAD_READY_CODE.has(codeSha256))) return 'current' as const;
+  return 'vrf-solo' as const;
 }
 
 export function RandomnessBadge({ view, generation }: { view: MachineView | null; generation?: MachineGeneration }) {

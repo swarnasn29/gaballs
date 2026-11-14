@@ -85,11 +85,12 @@ Re-run the simulation: see [sim/README.md](sim/README.md).
 | NFT (Machine NFT + Mythic certificates) | `nft.gaballs.testnet` | `contracts/nft` | NEP-171/177/178/181; Machine NFTs hold a USDT fee balance only the current owner can claim; certificates are soulbound |
 | Mock USDT (testnet) | `usdt.gaballs.testnet` | `contracts/mock-usdt` | NEP-141, 6 decimals, `faucet()` = 100 USDT per account per hour |
 | Welcome kit (app server, not a contract) | `gaballs-welcome.testnet` | `app/src/server/welcome.ts` | Pays gas and token registration for new Google/email and MetaMask players (§5) |
+| OutLayer (external, not ours) | `outlayer.testnet`, project `zavodil2.testnet/vrf-ark` | [out-layer/vrf-example](https://github.com/out-layer/vrf-example) | Runs the VRF module; returns an Ed25519 signature over `vrf:{request_id}:{buyer}:{seed}` |
 
 Code hashes and every deployment transaction: [docs/DEPLOYMENTS.md](docs/DEPLOYMENTS.md). Flagship parameters (read
-with `get_machine`): pack 10 USDT (newer machines: 10–1,000 USDT, `config.max_pack_price`), V = 3,000 USDT, vault seed 100M, creator allocation 100M, curve 800M, cap 25%,
+with `get_machine`): pack 10 USDT (newer machines such as `gbmax.gaballs.testnet`: any size from 10 to 1,000 USDT,
+`config.max_pack_price`), V = 3,000 USDT, vault seed 100M, creator allocation 100M, curve 800M, cap 25%,
 fees 0.5% + 0.2%, VRF timeout 300 blocks.
-| OutLayer (external, not ours) | `outlayer.testnet`, project `zavodil2.testnet/vrf-ark` | [out-layer/vrf-example](https://github.com/out-layer/vrf-example) | Runs the VRF module; returns an Ed25519 signature over `vrf:{request_id}:{buyer}:{seed}` |
 
 How the money flows: buyer → `usdt.ft_transfer_call(machine, 10 USDT)` → machine keeps 9.93 USDT in its curve, accrues
 0.05 USDT for the Machine NFT and 0.02 USDT for the platform → `sweep_fees()` → `usdt.ft_transfer_call(nft, fees,
@@ -115,9 +116,13 @@ the app's "Verifiable randomness proof" link (`/proof`) re-checks both in the br
 curve would need more USDT than it holds or if the payout is below `min_usdt_out`. `quote_sell(amount)` shows the numbers
 first. If the USDT transfer fails, the callback puts the tokens, curve and fees back.
 
-**The flagship is `gaballs.gaballs.testnet` ($GABALLS).** Machines are keyless and can never be upgraded, so older
+**The flagship is `gaballs.gaballs.testnet` ($GABALLS)**, the machine the squads use; it runs machine code
+`a43447c8…5935`. Machines launched after the variable-pack-size update (2026-11-13), such as **Gaballs Max**
+(`gbmax.gaballs.testnet`), run the factory's current code `f8a79bab…cde5`: the same features plus any pack size from
+10 to 1,000 USDT. The app lists both as current machines. Machines are keyless and can never be upgraded, so older
 ones stay playable under "Legacy machines" in the app: `gball`, `lfg`, `lfgg` (v1: block randomness, no sell-back) and
 `gumball`, `bubbles` (the first VRF version, whose proof check required the payer to sign, so squads could not pull).
+Anyone can launch a machine, so the list can also hold machines launched by other people (for example `lfgggg`).
 The current machine accepts a proof signed by any account as long as it carries this pull's unique seed; why that is
 safe is in [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md).
 
@@ -203,7 +208,8 @@ Proof (all links in [docs/DEPLOYMENTS.md](docs/DEPLOYMENTS.md)):
 
 ## 6. The game loop
 
-Every 30 seconds: pick 1–5 packs and turn the crank (or press **Open pack**). Every minute: a capsule drops and the
+Every 30 seconds: pick 1–5 packs (on newer machines, a pack size from 10 to 1,000 USDT on a slider) and turn the
+crank (or press **Open pack**). Every minute: a capsule drops and the
 reveal shows the tier, the tokens and their value now. Every session: fill the **Collection** on My stuff, the four
 tier characters, each filled in from the player's own pulls on-chain (not from the browser), with "N / 4 collected",
 a small celebration when the set is complete, and the trophies of squads the player is a council member of. Then sell
@@ -254,7 +260,7 @@ Checked with: Rust 1.95.0 (pinned in `rust-toolchain.toml`, target `wasm32-unkno
 near-cli-rs 0.31.1, Node 26 (Node 20+ is enough for the app). Sandbox tests need Linux, macOS or WSL.
 
 ### Build and test
-1. Unit tests: `cargo test --workspace` → `test result: ok` for factory 20, machine 49, mock-usdt 5, nft 27 (plus empty runs for `mock-outlayer` and doc tests).
+1. Unit tests: `cargo test --workspace` → `test result: ok` for factory 20, machine 57, mock-usdt 5, nft 27 (plus empty runs for `mock-outlayer` and doc tests).
 2. Build all contracts to wasm:
    - macOS / Linux: `./scripts/build-wasm.sh`
    - Windows: `powershell -ExecutionPolicy Bypass -File scripts\build-wasm.ps1` (adds `--no-abi`: cargo-near's ABI
@@ -263,7 +269,7 @@ near-cli-rs 0.31.1, Node 26 (Node 20+ is enough for the app). Sandbox tests need
    Output: `target/near/{gaballs_factory,gaballs_machine,gaballs_nft,gaballs_mock_usdt}/*.wasm`, plus
    `target/near/machine_test_hooks/gaballs_machine.wasm` (sandbox tests only, never deployed).
 3. Sandbox integration tests (Linux/macOS, or WSL on Windows): `cd tests/sandbox && cargo test -- --nocapture --test-threads=1`
-   → `test result: ok. 6 passed`. See [tests/sandbox/README.md](tests/sandbox/README.md).
+   → `test result: ok. 7 passed`. See [tests/sandbox/README.md](tests/sandbox/README.md).
 
 Windows note: `.cargo/config.toml` sets `AWS_LC_SYS_PREBUILT_NASM_x86_64_pc_windows_msvc` so the test
 dependencies build without installing NASM. The variable is target-specific and is ignored on macOS/Linux.
@@ -308,7 +314,7 @@ empty stub, and the post-build check fails the build if any trace remains.
 | Odds and multipliers are fixed | `near contract call-function as-read-only gaballs.gaballs.testnet get_odds json-args '{}' network-config testnet now` | 7500/2000/400/100 bps × 0.7/1.25/2.5/8, expected 9550 bps |
 | All launch parameters are public | `near contract call-function as-read-only gaballs.gaballs.testnet get_machine json-args '{}' network-config testnet now` | `config` (pack price, V, cap, fees, VRF key) and live curve, vault and totals |
 | The machine can't be upgraded or changed | `near account list-keys gaballs.gaballs.testnet network-config testnet now` | an empty table; there are no owner methods that change economics (`contracts/machine/src/lib.rs`) |
-| The machine runs the factory's code | `near contract call-function as-read-only gaballs.testnet get_config json-args '{}' network-config testnet now` | `machine_code_sha256` = `a43447c8…5935`, the same hash as the deployed machine code in [docs/DEPLOYMENTS.md](docs/DEPLOYMENTS.md) |
+| The machine runs the factory's code | `near contract call-function as-read-only gaballs.testnet get_config json-args '{}' network-config testnet now`, then `near account view-account-summary gbmax.gaballs.testnet network-config testnet now` | `machine_code_sha256` = `f8a79bab…cde5` (the variable-pack-size code), the same as Gaballs Max's contract checksum. The flagship `gaballs.gaballs.testnet` shows `a43447c8…5935`, the factory's code when it was launched; both hashes are in [docs/DEPLOYMENTS.md](docs/DEPLOYMENTS.md) |
 | A squad is a plain Sputnik DAO | `near account list-keys gaballs-squad.sputnikv2.testnet network-config testnet now` | an empty table; `get_policy` shows the council and the 2-of-3 threshold |
 | The welcome kit is limited | `curl -s https://gaballs.vercel.app/api/welcome` | `limits`: 0.5 NEAR per kit, 15 per day, 3 per IP per day, off below 1 NEAR |
 
@@ -395,6 +401,10 @@ Known limits:
 - @vercel/functions 3.11 (Runtime Cache) — welcome-kit rate limits
 - NearBlocks API v3 — the account's token history for the Collection
 - @playwright/test 1.65 — the no-popup loop recording (`app/e2e/`)
+- sharp (bundled with Next.js) — the icon sizes, favicon and Apple icon made from the team's icon (`brand/`)
+- Artwork: the Gaballs icon (`brand/source/icon-source.webp`) and the character and scene references in
+  `brand/source/` were provided by the team; the site's background scene, the 3D machine and the 2D machine are drawn in
+  code (`app/src/components/sky.tsx`, `app/src/components/machine/`)
 - AI-assisted: code in this repository was written with Claude Code (Anthropic)
 
 ## 13. Phase 7 checklist (before submission — not done yet)
