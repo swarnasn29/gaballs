@@ -119,7 +119,7 @@ export default function MyStuff() {
   if (!account) {
     return (
       <Card className="max-w-xl">
-        <h1 className="text-3xl font-bold text-grape">My stuff</h1>
+        <h1 className="text-3xl font-bold text-accent">My stuff</h1>
         <p className="mt-2">Connect a NEAR testnet wallet to see your balances, Machine NFTs and certificates.</p>
       </Card>
     );
@@ -132,7 +132,7 @@ export default function MyStuff() {
   return (
     <div className="flex flex-col gap-6">
       <Card>
-        <h1 className="text-3xl font-bold text-grape">My stuff</h1>
+        <h1 className="text-3xl font-bold text-accent">My stuff</h1>
         <p className="break-all font-semibold text-plum">{account}</p>
         <dl className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
           <Stat label="NEAR" value={d ? fmtNear(d.near) : '…'} source={{ href: accountUrl(account), label: 'nearblocks' }} />
@@ -204,7 +204,7 @@ export default function MyStuff() {
                   ) : (
                     <>
                       <PullProgress paidAt={paidAt[i]} compact />
-                      <Link className="ml-auto text-sm font-semibold text-grape underline" href={`/machine/${info.account_id}`}>
+                      <Link className="ml-auto text-sm font-semibold text-accent underline" href={`/machine/${info.account_id}`}>
                         Watch on the machine
                       </Link>
                     </>
@@ -247,7 +247,7 @@ export default function MyStuff() {
             .map((c) => (
               <li key={c.info.account_id} className="py-2">
                 <div className="flex items-center justify-between gap-3">
-                  <Link className="font-bold text-grape underline" href={`/machine/${c.info.account_id}`}>
+                  <Link className="font-bold text-accent underline" href={`/machine/${c.info.account_id}`}>
                     ${c.info.symbol}
                   </Link>
                   <span className="ml-auto tabular-nums">{fmtTokens(c.balance)}</span>

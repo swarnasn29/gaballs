@@ -113,11 +113,11 @@ export function LaunchDialog({ state, onClose }: { state: LaunchState; onClose: 
           </div>
         )}
 
-        <div className="relative w-full rounded-[2rem] bg-white p-6 text-center text-ink shadow-chunky ring-4 ring-white" aria-live="polite">
+        <div className="relative w-full glass-strong rounded-[2rem] p-6 text-center text-ink shadow-chunky" aria-live="polite">
           {busy && (
             <>
               <Building reduced={reduced} />
-              <h2 id="launch-title" className="mt-3 text-3xl font-bold text-grape">
+              <h2 id="launch-title" className="mt-3 text-3xl font-bold text-accent">
                 Building your machine…
               </h2>
               <p className="mt-1">
@@ -131,7 +131,7 @@ export function LaunchDialog({ state, onClose }: { state: LaunchState; onClose: 
                 {state.name} · ${state.symbol}
               </p>
               {state.s === 'confirming' && (
-                <a className="mt-2 inline-block text-sm font-semibold text-grape underline" href={txUrl(state.txHash)} target="_blank" rel="noreferrer">
+                <a className="mt-2 inline-block text-sm font-semibold text-accent underline" href={txUrl(state.txHash)} target="_blank" rel="noreferrer">
                   Watch the transaction
                 </a>
               )}
@@ -140,10 +140,10 @@ export function LaunchDialog({ state, onClose }: { state: LaunchState; onClose: 
 
           {live && (
             <>
-              <p className="mx-auto w-fit rounded-full bg-tier-mythic px-4 py-1 font-display text-sm font-bold uppercase tracking-wider text-ink">
+              <p className="mx-auto w-fit rounded-full bg-tier-mythic px-4 py-1 font-display text-sm font-bold uppercase tracking-wider text-ink-dark">
                 Launched
               </p>
-              <h2 id="launch-title" className="mt-2 text-4xl font-bold text-grape">
+              <h2 id="launch-title" className="mt-2 text-4xl font-bold text-accent">
                 Your machine is live!
               </h2>
               <p className="mt-1 font-display text-xl font-semibold">
@@ -175,11 +175,11 @@ export function LaunchDialog({ state, onClose }: { state: LaunchState; onClose: 
                 >
                   Open your machine
                 </Link>
-                <Link href="/me" className="min-h-12 rounded-full bg-blush px-6 py-3 font-display text-lg font-semibold text-grape shadow-chunky ring-2 ring-lilac">
+                <Link href="/me" className="min-h-12 rounded-full bg-blush px-6 py-3 font-display text-lg font-semibold text-accent shadow-chunky ring-2 ring-lilac">
                   See my Machine NFT
                 </Link>
               </div>
-              <a className="mt-3 inline-block text-sm font-semibold text-grape underline" href={txUrl(state.txHash)} target="_blank" rel="noreferrer">
+              <a className="mt-3 inline-block text-sm font-semibold text-accent underline" href={txUrl(state.txHash)} target="_blank" rel="noreferrer">
                 View the launch transaction
               </a>
             </>
@@ -189,12 +189,12 @@ export function LaunchDialog({ state, onClose }: { state: LaunchState; onClose: 
             <>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={art.characters.mascot} alt="" width={90} className="mx-auto opacity-90" />
-              <h2 id="launch-title" className="mt-2 text-3xl font-bold text-grape">
+              <h2 id="launch-title" className="mt-2 text-3xl font-bold text-accent">
                 The machine wasn&apos;t created
               </h2>
               <p className="mt-2">{state.message}</p>
               {state.txHash && (
-                <a className="mt-2 inline-block text-sm font-semibold text-grape underline" href={txUrl(state.txHash)} target="_blank" rel="noreferrer">
+                <a className="mt-2 inline-block text-sm font-semibold text-accent underline" href={txUrl(state.txHash)} target="_blank" rel="noreferrer">
                   View the transaction
                 </a>
               )}

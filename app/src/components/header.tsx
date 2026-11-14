@@ -36,8 +36,8 @@ function NavList({ pathname }: { pathname: string | null }) {
             href={l.href}
             aria-current={active ? 'page' : undefined}
             className={cx(
-              'flex-1 whitespace-nowrap rounded-full px-2 py-2 text-center font-display text-sm font-semibold sm:flex-none sm:px-4 sm:text-base',
-              active ? 'bg-grape text-white' : 'text-grape hover:bg-blush',
+              'flex-1 whitespace-nowrap border-b-[3px] px-2 pb-2 pt-1 text-center font-display text-sm font-semibold sm:flex-none sm:px-4 sm:text-lg',
+              active ? 'border-accent text-ink' : 'border-transparent text-plum hover:text-ink',
             )}
           >
             {l.label}
@@ -53,15 +53,14 @@ export function Header() {
 
   return (
     <header className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-3 px-4 pt-4 sm:px-6">
-      <Link href="/" className="flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1.5 shadow-chunky sm:gap-2 sm:px-3">
+      <Link href="/" className="flex items-center gap-2 py-1">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={art.brand.logo} alt="" width={36} height={36} className="rounded-lg" />
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={art.brand.wordmark} alt="Gaballs" width={92} height={24} className="h-6 w-auto sm:h-[30px]" />
-        <span className="rounded-full bg-grape px-2 py-0.5 text-[11px] font-bold uppercase text-white">{NETWORK}</span>
+        <img src={art.brand.logo} alt="" width={44} height={44} className="h-10 w-10 sm:h-11 sm:w-11" />
+        <span className="font-display text-2xl font-bold text-ink sm:text-3xl">Gaballs</span>
+        <span className="rounded-full bg-mint px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-mint-ink">{NETWORK}</span>
       </Link>
 
-      <nav aria-label="Main" className="order-3 flex w-full gap-1 rounded-full bg-white p-1 shadow-chunky sm:order-none sm:w-auto">
+      <nav aria-label="Main" className="order-3 flex w-full gap-1 border-b-2 border-lilac sm:order-none sm:w-auto">
         <Suspense fallback={<NavList pathname={null} />}>
           <NavLinks />
         </Suspense>

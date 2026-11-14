@@ -65,9 +65,9 @@ export function PullProgress({ paidAt, count, compact }: { paidAt: number | null
             <span
               className={cx(
                 'flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold',
-                s.state === 'done' && 'bg-good text-white',
+                s.state === 'done' && 'bg-good text-ink-dark',
                 s.state === 'active' && 'bg-grape text-white',
-                s.state === 'todo' && 'bg-white text-plum ring-2 ring-lilac',
+                s.state === 'todo' && 'glass text-plum ring-2 ring-lilac',
               )}
               aria-hidden
             >
@@ -87,7 +87,7 @@ export function PullProgress({ paidAt, count, compact }: { paidAt: number | null
             <Orbs />
             <div className="min-w-0 flex-1">
               {/* An estimate that slows near the end instead of claiming to know the finish time. */}
-              <div className="h-2 overflow-hidden rounded-full bg-white">
+              <div className="h-2 overflow-hidden rounded-full bg-white/15">
                 <div
                   className="h-full rounded-full bg-lilac transition-[width] duration-1000 ease-linear"
                   style={{ width: `${Math.round(95 * (1 - Math.exp(-elapsed / (TYPICAL_SECONDS / 2))))}%` }}
@@ -98,9 +98,9 @@ export function PullProgress({ paidAt, count, compact }: { paidAt: number | null
               </p>
             </div>
           </div>
-          <p className="text-sm font-semibold text-grape">This wait is what makes the result provably fair.</p>
+          <p className="text-sm font-semibold text-accent">This wait is what makes the result provably fair.</p>
           {elapsed > SLOW_SECONDS && (
-            <p className="rounded-2xl bg-white p-3 text-sm text-ink ring-2 ring-lilac" data-testid="slow-proof">
+            <p className="rounded-2xl glass p-3 text-sm text-ink ring-2 ring-lilac" data-testid="slow-proof">
               {elapsed < AUTO_REFUND_SECONDS ? (
                 <>
                   OutLayer, the randomness service, is slow to answer right now. If it has not answered about 2 minutes

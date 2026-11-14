@@ -107,7 +107,7 @@ export function DeedCard({
       <img src={art.fx.coin} alt="" aria-hidden className="absolute right-5 top-5 h-11 w-11" />
       <div className="relative rounded-[1.25rem] border-[3px] border-lilac px-4 py-4 sm:px-6">
         <p className="pr-12 text-xs font-bold uppercase tracking-wider text-plum">Machine deed · NFT</p>
-        <Link href={`/machine/${machineId}`} className="block break-words pr-12 font-display text-2xl font-bold text-grape underline-offset-4 hover:underline">
+        <Link href={`/machine/${machineId}`} className="block break-words pr-12 font-display text-2xl font-bold text-accent underline-offset-4 hover:underline">
           {machineId}
         </Link>
         <dl className="mt-3 grid grid-cols-2 gap-2">
@@ -115,13 +115,13 @@ export function DeedCard({
             label="Claimable now"
             value={fmtUsdt(feeBalance)}
             source={{ contract: NFT_ID, method: 'get_fee_balance', args: { token_id: token.token_id } }}
-            className="bg-white"
+            className="glass"
           />
           <Stat
             label="Still in machine"
             value={accrued === null ? '…' : fmtUsdt(accrued)}
             source={{ contract: machineId, method: 'get_machine' }}
-            className="bg-white"
+            className="glass"
           />
         </dl>
         <div className="mt-3 flex flex-wrap gap-2">

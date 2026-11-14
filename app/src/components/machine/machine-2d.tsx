@@ -12,8 +12,16 @@ import type { StagePhase } from './shared';
 // Geometry of art.machine.flat (viewBox 300×420): dome centre (150,140) r≈118, crank knob (150,318), chute (224,382).
 const VB = { w: 300, h: 420 };
 const BALL = 22;
-// Pastel gumball mix from the brand: blues plus mint, pink and lavender.
-const BALL_COLORS = ['#2e78c7', '#7cc4f2', '#7fdcb0', '#f6a8cf', '#b9a0ea', '#7cc4f2', '#7fdcb0'];
+// Blue gumball mix (no pink), each with a soft light-to-dark shade.
+const BALL_COLORS = [
+  'radial-gradient(circle at 35% 30%, #ffffff, #c9e6f8)',
+  'radial-gradient(circle at 35% 30%, #cfe0ff, #7fa5f2)',
+  'radial-gradient(circle at 35% 30%, #d6eefc, #7cc4f2)',
+  'radial-gradient(circle at 35% 30%, #8ecbf3, #2e78c7)',
+  'radial-gradient(circle at 35% 30%, #d6eefc, #7cc4f2)',
+  'radial-gradient(circle at 35% 30%, #ffffff, #c9e6f8)',
+  'radial-gradient(circle at 35% 30%, #cfe0ff, #7fa5f2)',
+];
 
 function layoutBalls(n: number) {
   const out: { x: number; y: number; color: string }[] = [];
@@ -27,7 +35,7 @@ function layoutBalls(n: number) {
     const offset = row % 2 ? BALL / 2 : 0;
     for (let x = cx - half + offset; x <= cx + half && out.length < n; x += BALL) {
       const i = out.length;
-      out.push({ x, y, color: i === Math.floor(n * 0.37) ? '#ffc93c' : BALL_COLORS[(i * 5 + row * 3) % BALL_COLORS.length] });
+      out.push({ x, y, color: i === Math.floor(n * 0.37) ? 'linear-gradient(140deg, #fff1a8, #ffc93c)' : BALL_COLORS[(i * 5 + row * 3) % BALL_COLORS.length] });
     }
     row++;
   }
@@ -135,7 +143,7 @@ export function Machine2D({
           ))}
       </motion.div>
       {pending && reduced && (
-        <p className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-white px-4 py-2 text-sm font-bold text-grape shadow-chunky">
+        <p className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full glass px-4 py-2 text-sm font-bold text-accent shadow-chunky">
           Waiting for the contract…
         </p>
       )}

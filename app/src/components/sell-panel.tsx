@@ -96,7 +96,7 @@ export function SellPanel({
             value={text}
             onChange={(e) => setText(e.target.value)}
             aria-invalid={amount === null || tooMuch}
-            className="w-full rounded-2xl border-2 border-lilac bg-white px-3 py-2 font-normal tabular-nums"
+            className="w-full rounded-2xl border-2 border-lilac glass px-3 py-2 font-normal tabular-nums"
           />
         </label>
         {[
@@ -108,7 +108,7 @@ export function SellPanel({
             key={label as string}
             type="button"
             onClick={() => setText(toText(units as bigint))}
-            className="h-11 rounded-full bg-white px-3 font-display font-semibold text-grape ring-2 ring-lilac"
+            className="h-11 rounded-full glass px-3 font-display font-semibold text-accent ring-2 ring-lilac"
           >
             {label as string}
           </button>
@@ -122,25 +122,25 @@ export function SellPanel({
           label="You receive"
           value={current ? fmtUsdt(current.usdt_out) : '…'}
           source={{ contract: machineId, method: 'quote_sell', args: { amount: (amount ?? 0n).toString() } }}
-          className="col-span-2 bg-white ring-4 ring-grape"
+          className="col-span-2 glass ring-4 ring-grape"
         />
         <Stat
           label="Out of the curve"
           value={current ? fmtUsdt(current.usdt_gross) : '…'}
           source={{ contract: machineId, method: 'quote_sell', args: { amount: (amount ?? 0n).toString() } }}
-          className="bg-white"
+          className="glass"
         />
         <Stat
           label="Fees (0.5% + 0.2%)"
           value={current ? fmtUsdt((BigInt(current.nft_fee) + BigInt(current.platform_fee)).toString()) : '…'}
           source={{ contract: machineId, method: 'quote_sell', args: { amount: (amount ?? 0n).toString() } }}
-          className="bg-white"
+          className="glass"
         />
         <Stat
           label="Price after"
           value={current ? fmtPrice(current.price_after) : '…'}
           source={{ contract: machineId, method: 'quote_sell', args: { amount: (amount ?? 0n).toString() } }}
-          className="col-span-2 bg-white"
+          className="col-span-2 glass"
         />
       </dl>
       <Button

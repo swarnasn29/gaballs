@@ -75,7 +75,7 @@ export default function Squads() {
   return (
     <div className="flex flex-col gap-6">
       <Card className="max-w-3xl">
-        <h1 className="text-4xl font-bold text-grape">Squads</h1>
+        <h1 className="text-4xl font-bold text-accent">Squads</h1>
         <p className="mt-2 text-lg">
           Gacha with friends. A squad is a shared treasury: members chip in USDT, vote to open packs together, and split
           the prize or sell it back. Two of three (or whatever you choose) must approve before anything moves.
@@ -94,7 +94,7 @@ export default function Squads() {
               <li key={dao}>
                 <Link
                   href={`/squads/${dao}`}
-                  className="flex items-center justify-between gap-3 rounded-2xl bg-blush px-4 py-3 font-semibold text-grape hover:bg-white hover:ring-2 hover:ring-lilac"
+                  className="flex items-center justify-between gap-3 rounded-2xl bg-blush px-4 py-3 font-semibold text-accent hover:bg-white/15 hover:ring-2 hover:ring-lilac"
                 >
                   <span className="min-w-0 truncate">{dao}</span>
                   <span className="shrink-0 text-sm text-plum">{dao === FEATURED_SQUAD ? 'Demo squad' : 'Opened here'} →</span>
@@ -111,7 +111,7 @@ export default function Squads() {
               value={openName}
               onChange={(e) => setOpenName(e.target.value)}
               placeholder={`name or name.${SPUTNIK_FACTORY}`}
-              className="min-w-0 flex-1 rounded-2xl border-2 border-lilac bg-white px-4 py-2"
+              className="min-w-0 flex-1 rounded-2xl border-2 border-lilac glass px-4 py-2"
             />
             <Button type="submit" variant="secondary" className="min-h-11 py-2 text-base">
               Open
@@ -139,7 +139,7 @@ export default function Squads() {
                 onChange={(e) => setTitle(e.target.value)}
                 maxLength={48}
                 placeholder="Friday Gumball Club"
-                className="rounded-2xl border-2 border-lilac bg-white px-4 py-3 font-normal"
+                className="rounded-2xl border-2 border-lilac glass px-4 py-3 font-normal"
               />
             </label>
             <label className="flex flex-col gap-1 font-bold">
@@ -150,7 +150,7 @@ export default function Squads() {
                 onChange={(e) => setName(e.target.value.toLowerCase())}
                 aria-invalid={name !== '' && !nameOk}
                 placeholder="friday-club"
-                className="rounded-2xl border-2 border-lilac bg-white px-4 py-3 font-normal"
+                className="rounded-2xl border-2 border-lilac glass px-4 py-3 font-normal"
               />
               <span className="break-all text-sm font-normal text-plum">Account: {name ? squadIdFor(name) : '—'}</span>
             </label>
@@ -161,7 +161,7 @@ export default function Squads() {
                 value={membersText}
                 onChange={(e) => setMembersText(e.target.value)}
                 aria-invalid={!!badMember}
-                className="rounded-2xl border-2 border-lilac bg-white px-4 py-3 font-normal"
+                className="rounded-2xl border-2 border-lilac glass px-4 py-3 font-normal"
               />
               {badMember && <span className="text-sm font-semibold text-bad">“{badMember}” is not a NEAR account id.</span>}
             </label>
@@ -177,7 +177,7 @@ export default function Squads() {
                     className={
                       threshold === n
                         ? 'h-11 w-11 rounded-full bg-grape font-display text-lg font-semibold text-white'
-                        : 'h-11 w-11 rounded-full bg-blush font-display text-lg font-semibold text-grape ring-2 ring-lilac'
+                        : 'h-11 w-11 rounded-full bg-blush font-display text-lg font-semibold text-accent ring-2 ring-lilac'
                     }
                   >
                     {n}

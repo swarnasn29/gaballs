@@ -98,7 +98,7 @@ export function ProposeForms({
             type="button"
             aria-selected={tab === t.id}
             onClick={() => setTab(t.id)}
-            className={cx('rounded-full px-3 py-2 font-display text-sm font-semibold', tab === t.id ? 'bg-grape text-white' : 'text-grape hover:bg-white')}
+            className={cx('rounded-full px-3 py-2 font-display text-sm font-semibold', tab === t.id ? 'bg-grape text-white' : 'text-accent hover:bg-white/15')}
           >
             {t.label}
           </button>
@@ -115,7 +115,7 @@ export function ProposeForms({
                 type="button"
                 aria-pressed={count === n}
                 onClick={() => setCount(n)}
-                className={cx('h-11 w-11 rounded-full font-display text-lg font-semibold ring-2', count === n ? 'bg-grape text-white ring-grape' : 'bg-blush text-grape ring-lilac')}
+                className={cx('h-11 w-11 rounded-full font-display text-lg font-semibold ring-2', count === n ? 'bg-grape text-white ring-grape' : 'bg-blush text-accent ring-lilac')}
               >
                 {n}
               </button>
@@ -142,7 +142,7 @@ export function ProposeForms({
                 type="button"
                 aria-pressed={pct === v}
                 onClick={() => setPct(v)}
-                className={cx('rounded-full px-4 py-2 font-display font-semibold ring-2', pct === v ? 'bg-grape text-white ring-grape' : 'bg-blush text-grape ring-lilac')}
+                className={cx('rounded-full px-4 py-2 font-display font-semibold ring-2', pct === v ? 'bg-grape text-white ring-grape' : 'bg-blush text-accent ring-lilac')}
               >
                 {v}% each
               </button>
@@ -175,7 +175,7 @@ export function ProposeForms({
                 type="button"
                 aria-pressed={sellPct === v}
                 onClick={() => setSellPct(v)}
-                className={cx('rounded-full px-4 py-2 font-display font-semibold ring-2', sellPct === v ? 'bg-grape text-white ring-grape' : 'bg-blush text-grape ring-lilac')}
+                className={cx('rounded-full px-4 py-2 font-display font-semibold ring-2', sellPct === v ? 'bg-grape text-white ring-grape' : 'bg-blush text-accent ring-lilac')}
               >
                 {v === 100 ? 'All' : `${v}%`}
               </button>
@@ -202,7 +202,7 @@ export function ProposeForms({
             <select
               value={deedId}
               onChange={(e) => setDeed(e.target.value)}
-              className="rounded-2xl border-2 border-lilac bg-white px-3 py-2"
+              className="rounded-2xl border-2 border-lilac glass px-3 py-2"
             >
               {claimable.map((d) => (
                 <option key={d.token.token_id} value={d.token.token_id}>

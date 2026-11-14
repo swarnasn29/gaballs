@@ -78,7 +78,7 @@ function PackSizePicker({ min, max, amount, setAmount, view }: PackRange & { amo
         <label htmlFor="pack-size" className="font-semibold">
           Pack size
         </label>
-        <span className="font-display text-3xl font-bold text-grape" data-testid="pack-size">
+        <span className="font-display text-3xl font-bold text-ink" data-testid="pack-size">
           {fmtUsdt(amount)}
         </span>
       </div>
@@ -91,7 +91,8 @@ function PackSizePicker({ min, max, amount, setAmount, view }: PackRange & { amo
         value={posOf(amount, r)}
         onChange={(e) => setAmount(amountAt(Number(e.target.value), r))}
         aria-valuetext={`${Number(amount) / 1e6} USDT`}
-        className="h-11 w-full cursor-pointer accent-grape"
+        className="pack-slider h-11 w-full cursor-pointer"
+        style={{ '--fill': `${(posOf(amount, r) / STEPS) * 100}%` } as React.CSSProperties}
       />
       <div className="flex flex-wrap gap-1.5">
         {presets.map((p) => (
@@ -102,7 +103,7 @@ function PackSizePicker({ min, max, amount, setAmount, view }: PackRange & { amo
             onClick={() => setAmount(p)}
             className={cx(
               'min-h-11 flex-1 rounded-full px-2 font-display text-sm font-semibold ring-2',
-              amount === p ? 'bg-grape text-white ring-grape' : 'bg-blush text-grape ring-lilac',
+              amount === p ? 'bg-gold text-ink-dark ring-[#d9a21e]' : 'bg-white text-ink ring-lilac hover:bg-blush',
             )}
           >
             {fmtUsdt(p)}
@@ -186,7 +187,7 @@ export function BuyPanel({
             onClick={() => setCount(n)}
             className={cx(
               'h-11 w-11 rounded-full font-display text-lg font-semibold ring-2 disabled:opacity-60',
-              count === n ? 'bg-grape text-white ring-grape' : 'bg-blush text-grape ring-lilac',
+              count === n ? 'bg-grape text-white ring-grape' : 'bg-blush text-accent ring-lilac',
             )}
           >
             {n}
@@ -239,7 +240,7 @@ export function BuyPanel({
           </p>
         )}
         {timedOut && state.txHash && (
-          <a className="font-semibold text-grape underline" href={txUrl(state.txHash)} target="_blank" rel="noreferrer">
+          <a className="font-semibold text-accent underline" href={txUrl(state.txHash)} target="_blank" rel="noreferrer">
             View the payment transaction
           </a>
         )}
@@ -274,7 +275,7 @@ export function BuyPanel({
               </p>
             ))}
             {state.txHash && (
-              <a className="font-semibold text-grape underline" href={txUrl(state.txHash)} target="_blank" rel="noreferrer">
+              <a className="font-semibold text-accent underline" href={txUrl(state.txHash)} target="_blank" rel="noreferrer">
                 View transaction on nearblocks
               </a>
             )}

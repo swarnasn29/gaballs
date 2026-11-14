@@ -109,7 +109,7 @@ export default function Launch() {
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,420px)_minmax(0,1fr)]">
       <LaunchDialog state={state} onClose={close} />
       <Card>
-        <h1 className="text-3xl font-bold text-grape">Launch a machine</h1>
+        <h1 className="text-3xl font-bold text-accent">Launch a machine</h1>
         <p className="mt-1">
           The NEAR you attach creates the machine&apos;s own account and pays for its code and storage; it stays with the
           machine. You receive the Machine NFT (it earns 0.5% of every pack) and your coin allocation.
@@ -143,7 +143,7 @@ export default function Launch() {
               maxLength={64}
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="rounded-2xl border-2 border-lilac bg-white px-4 py-3 font-normal"
+              className="rounded-2xl border-2 border-lilac glass px-4 py-3 font-normal"
               placeholder="Gumdrop Gang"
             />
           </label>
@@ -154,7 +154,7 @@ export default function Launch() {
               value={symbol}
               onChange={(e) => setSymbol(e.target.value)}
               aria-invalid={symbol !== '' && !symbolOk}
-              className="rounded-2xl border-2 border-lilac bg-white px-4 py-3 font-normal uppercase"
+              className="rounded-2xl border-2 border-lilac glass px-4 py-3 font-normal uppercase"
               placeholder="GUMDROP"
             />
             <span className="text-sm font-normal text-plum">

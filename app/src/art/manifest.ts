@@ -15,7 +15,7 @@ export const art = {
     bubble: '/art/background/bubble.svg',
   },
   brand: {
-    /** The character's head in a baby-blue tile (rendered from brand/; 96 px, shown at 36). */
+    /** The Gaballs icon: a blue gumball with glowing eyes (brand/source/icon-source.webp; 96 px, transparent, shown at 40-44). */
     logo: '/art/brand/icon.png',
     /** "Gaballs" wordmark, trimmed (368x96; shown at 24-30 px high). */
     wordmark: '/art/brand/wordmark.png',

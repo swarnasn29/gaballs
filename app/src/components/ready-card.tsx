@@ -11,7 +11,7 @@ import { Button } from './ui';
 
 export function ReadyBadge() {
   return (
-    <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-tier-mythic px-3 py-1 font-display text-sm font-bold text-ink shadow-chunky">
+    <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-tier-mythic px-3 py-1 font-display text-sm font-bold text-ink-dark shadow-chunky">
       <span className="h-2 w-2 animate-pulse rounded-full bg-grape" aria-hidden />
       Ready to open!
     </span>

@@ -7,7 +7,7 @@ const cx = (...c: (string | false | undefined)[]) => c.filter(Boolean).join(' ')
 export function Card({ className, children, ...rest }: ComponentProps<'section'>) {
   return (
     <section
-      className={cx('rounded-[2rem] bg-card p-5 text-ink shadow-chunky ring-4 ring-white sm:p-6', className)}
+      className={cx('glass rounded-[2rem] p-5 text-ink shadow-chunky sm:p-6', className)}
       {...rest}
     >
       {children}
@@ -23,9 +23,9 @@ export function Button({ variant = 'primary', className, ...rest }: ButtonProps)
       className={cx(
         'inline-flex min-h-12 items-center justify-center gap-2 rounded-full px-6 py-3 font-display text-lg font-semibold',
         'transition-transform active:translate-y-1 disabled:cursor-not-allowed disabled:opacity-60',
-        variant === 'primary' && 'bg-grape text-white shadow-chunky-ink hover:bg-plum',
-        variant === 'secondary' && 'bg-blush text-grape shadow-chunky ring-2 ring-lilac hover:bg-white',
-        variant === 'ghost' && 'text-grape underline-offset-4 hover:underline',
+        variant === 'primary' && 'bg-grape text-white shadow-chunky-ink hover:brightness-110',
+        variant === 'secondary' && 'bg-blush text-accent shadow-chunky ring-2 ring-lilac hover:bg-white/15',
+        variant === 'ghost' && 'text-accent underline-offset-4 hover:underline',
         className,
       )}
       {...rest}
@@ -58,7 +58,7 @@ export function Stat({
     <div className={cx('rounded-2xl bg-blush px-3 py-2', className)}>
       <dt className="text-xs font-bold uppercase tracking-wide text-plum">{label}</dt>
       <dd className="font-display text-xl font-semibold text-ink">{value}</dd>
-      <Link href={href} className="text-[11px] font-semibold text-grape underline-offset-2 hover:underline">
+      <Link href={href} className="text-[11px] font-semibold text-accent underline-offset-2 hover:underline">
         source: {sourceLabel}
       </Link>
     </div>
@@ -67,7 +67,7 @@ export function Stat({
 
 export function Pill({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <span className={cx('inline-flex items-center rounded-full bg-blush px-3 py-1 text-sm font-bold text-grape', className)}>
+    <span className={cx('inline-flex items-center rounded-full bg-blush px-3 py-1 text-sm font-bold text-accent', className)}>
       {children}
     </span>
   );

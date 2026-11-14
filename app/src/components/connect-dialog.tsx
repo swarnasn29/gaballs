@@ -25,8 +25,8 @@ function Modal({ children, onBackdrop, labelledBy }: { children: React.ReactNode
   }, [onBackdrop]);
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 py-10 sm:items-center" role="dialog" aria-modal="true" aria-labelledby={labelledBy}>
-      <div className="fixed inset-0 bg-[rgba(27, 58, 99,0.65)]" onClick={onBackdrop} />
-      <div className="relative w-full max-w-md rounded-[2rem] bg-white p-6 text-ink shadow-chunky ring-4 ring-white" aria-live="polite">
+      <div className="fixed inset-0 bg-[rgba(6,4,24,0.7)]" onClick={onBackdrop} />
+      <div className="relative w-full max-w-md glass-strong rounded-[2rem] p-6 text-ink shadow-chunky" aria-live="polite">
         {children}
       </div>
     </div>
@@ -63,7 +63,7 @@ export function ConnectDialog({
   if (eth)
     return (
       <Modal onBackdrop={onClose} labelledBy="eth-title">
-        <h2 id="eth-title" className="text-center text-2xl font-bold text-grape">
+        <h2 id="eth-title" className="text-center text-2xl font-bold text-accent">
           MetaMask sign-in
         </h2>
         <ol className="mt-4 space-y-3 text-sm">
@@ -74,7 +74,7 @@ export function ConnectDialog({
               network; nothing is spent.
             </p>
             {eth.s === 'step2' ? (
-              <p className="mt-2 text-xs font-semibold text-grape" data-testid="eth-step1-done">
+              <p className="mt-2 text-xs font-semibold text-accent" data-testid="eth-step1-done">
                 Done
               </p>
             ) : (
@@ -107,7 +107,7 @@ export function ConnectDialog({
 
   return (
     <Modal onBackdrop={onClose} labelledBy="connect-title">
-      <h2 id="connect-title" className="text-center text-3xl font-bold text-grape">
+      <h2 id="connect-title" className="text-center text-3xl font-bold text-accent">
         Start playing
       </h2>
       <p className="mt-1 text-center text-sm text-plum">
@@ -193,7 +193,7 @@ export function WelcomeKitDialog({ accountId, getToken }: { accountId: string; g
       {state.s === 'sending' && (
         <div className="text-center">
           <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-lilac border-t-grape" aria-hidden />
-          <h2 id="kit-title" className="mt-3 text-2xl font-bold text-grape">
+          <h2 id="kit-title" className="mt-3 text-2xl font-bold text-accent">
             Setting up your account
           </h2>
           <p className="mt-1 text-sm">
@@ -204,7 +204,7 @@ export function WelcomeKitDialog({ accountId, getToken }: { accountId: string; g
       )}
       {state.s === 'sent' && (
         <div className="text-center" data-testid="welcome-kit-done">
-          <h2 id="kit-title" className="text-3xl font-bold text-grape">
+          <h2 id="kit-title" className="text-3xl font-bold text-accent">
             You&apos;re in!
           </h2>
           <p className="mt-1 text-sm">
@@ -214,7 +214,7 @@ export function WelcomeKitDialog({ accountId, getToken }: { accountId: string; g
             {state.txs.map((t) => (
               <li key={t.hash}>
                 Welcome kit: {t.what} ·{' '}
-                <a className="font-semibold text-grape underline" href={txUrl(t.hash)} target="_blank" rel="noreferrer">
+                <a className="font-semibold text-accent underline" href={txUrl(t.hash)} target="_blank" rel="noreferrer">
                   tx
                 </a>
               </li>
@@ -227,7 +227,7 @@ export function WelcomeKitDialog({ accountId, getToken }: { accountId: string; g
       )}
       {state.s === 'error' && (
         <div className="text-center">
-          <h2 id="kit-title" className="text-2xl font-bold text-grape">
+          <h2 id="kit-title" className="text-2xl font-bold text-accent">
             No welcome kit right now
           </h2>
           <p className="mt-2 text-sm" role="alert">

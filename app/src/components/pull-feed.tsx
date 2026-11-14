@@ -25,7 +25,7 @@ function RowBody({ p, mine, icon }: { p: PullRecord; mine: boolean; icon: React.
       {mine && <span className="rounded-full bg-grape px-2 py-0.5 text-[11px] font-bold text-white">You</span>}
       {p.capped && <span className="text-[11px] font-semibold text-warn">capped</span>}
       <span className="ml-auto tabular-nums">{fmtTokens(p.payout)} tokens</span>
-      <a className="text-xs font-semibold text-grape underline" href={`${EXPLORER_URL}/blocks/${p.block}`} target="_blank" rel="noreferrer">
+      <a className="text-xs font-semibold text-accent underline" href={`${EXPLORER_URL}/blocks/${p.block}`} target="_blank" rel="noreferrer">
         block {p.block}
       </a>
     </>

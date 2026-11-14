@@ -67,12 +67,12 @@ function ResultLinks({ txHash, proof, center }: { txHash: string; proof: string 
   return (
     <p className={cx('mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm font-semibold', center && 'justify-center')}>
       {proof && (
-        <a className="text-grape underline" href={proof} target="_blank" rel="noreferrer">
+        <a className="text-accent underline" href={proof} target="_blank" rel="noreferrer">
           Verifiable randomness proof
         </a>
       )}
       {txHash && (
-        <a className="text-grape underline" href={txUrl(txHash)} target="_blank" rel="noreferrer">
+        <a className="text-accent underline" href={txUrl(txHash)} target="_blank" rel="noreferrer">
           View transaction on nearblocks
         </a>
       )}
@@ -163,7 +163,7 @@ export function RevealDialog({
           setMuted(sound !== 'muted');
         }}
         aria-pressed={sound !== 'muted'}
-        className="fixed right-3 top-3 z-[70] rounded-full bg-white px-3 py-1.5 text-xs font-bold text-grape shadow-chunky"
+        className="fixed right-3 top-3 z-[70] rounded-full glass px-3 py-1.5 text-xs font-bold text-accent shadow-chunky"
       >
         {sound === 'muted' ? 'Sound off' : 'Sound on'}
       </button>
@@ -236,10 +236,10 @@ export function RevealDialog({
         )}
 
         {/* solid card: all numbers live here (AA contrast) */}
-        <div className="relative w-full rounded-[2rem] bg-white p-5 text-ink shadow-chunky ring-4 ring-white" aria-live="polite">
+        <div className="relative w-full glass-strong rounded-[2rem] p-5 text-ink shadow-chunky" aria-live="polite">
           {stage === 'closed' && (
             <div className="text-center">
-              <h2 id="reveal-title" className="text-3xl font-bold text-grape">
+              <h2 id="reveal-title" className="text-3xl font-bold text-accent">
                 {multi ? `Capsule ${i + 1} of ${pulls.length}` : 'Your capsule is here!'}
               </h2>
               <p className="mt-1">Tap the capsule to crack it open.</p>
@@ -247,21 +247,21 @@ export function RevealDialog({
             </div>
           )}
           {stage === 'cracking' && (
-            <p id="reveal-title" className="text-center font-display text-2xl font-bold text-grape">
+            <p id="reveal-title" className="text-center font-display text-2xl font-bold text-accent">
               Cracking…
             </p>
           )}
           {revealed && (
             <div className="flex flex-col items-center gap-2 text-center">
               <span
-                className="rounded-full px-4 py-1 font-display text-sm font-bold uppercase tracking-wider text-ink"
+                className="rounded-full px-4 py-1 font-display text-sm font-bold uppercase tracking-wider text-ink-dark"
                 style={{ background: tierColor[pull.tier] }}
               >
                 {pull.tier}
               </span>
               <motion.h2
                 id="reveal-title"
-                className="font-display font-bold text-grape"
+                className="font-display font-bold text-accent"
                 style={{ fontSize: pull.tier === 'Mythic' ? 52 : pull.tier === 'Epic' ? 46 : pull.tier === 'Rare' ? 40 : 34 }}
                 initial={reduced ? false : { scale: 0.5 }}
                 animate={{ scale: 1 }}
@@ -309,7 +309,7 @@ export function RevealDialog({
           )}
           {stage === 'summary' && (
             <div>
-              <h2 id="reveal-title" className="text-center text-3xl font-bold text-grape">
+              <h2 id="reveal-title" className="text-center text-3xl font-bold text-accent">
                 All {pulls.length} capsules
               </h2>
               <ul className="mt-3 flex flex-col divide-y divide-lilac">

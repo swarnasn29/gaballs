@@ -20,7 +20,7 @@ export const metadata: Metadata = {
   twitter: { card: 'summary_large_image', title: 'Gaballs', description: 'Gumball machines for memecoins on NEAR. Play free with Google, no wallet.' },
 };
 
-export const viewport: Viewport = { themeColor: '#2E78C7' };
+export const viewport: Viewport = { themeColor: '#ddf0ff' };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (

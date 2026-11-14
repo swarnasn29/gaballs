@@ -25,11 +25,11 @@ async function Proof({ searchParams }: { searchParams: Params }) {
 export default function ProofPage({ searchParams }: { searchParams: Params }) {
   return (
     <Card className="flex flex-col gap-3">
-      <h1 className="text-3xl font-bold text-grape">Randomness proof</h1>
+      <h1 className="text-3xl font-bold text-accent">Randomness proof</h1>
       <Suspense fallback={<p>Loading the proof…</p>}>
         <Proof searchParams={searchParams} />
       </Suspense>
-      <Link href="/" className="font-semibold text-grape underline">
+      <Link href="/" className="font-semibold text-accent underline">
         Back to machines
       </Link>
     </Card>

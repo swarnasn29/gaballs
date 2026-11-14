@@ -48,14 +48,14 @@ const CHUTE_Y = 0.42;
 const TRAY_POS = new THREE.Vector3(0, 0.33, 1.06);
 
 const PALETTE = {
-  grape: '#2e78c7',
-  plum: '#2e5a86',
-  lavender: '#7cc4f2',
-  lilac: '#afdff5',
-  blush: '#ddf0ff',
+  grape: '#5fb3ee',
+  plum: '#2e78c7',
+  lavender: '#afdff5',
+  lilac: '#9fd3f3',
+  blush: '#e8f5ff',
   gold: '#ffc93c',
   ink: '#1b3a63',
-  sky: '#bfe3fa',
+  sky: '#cfe8fb',
 };
 
 function lathe(points: [number, number][], segments: number, samples = 48) {
@@ -77,33 +77,50 @@ function rng(seed: number) {
 // ---------------------------------------------------------------------------------------------- materials
 function useMaterials(quality: Quality) {
   return useMemo(() => {
+    // "Glass and light" skin: frosted baby-blue acrylic (satin finish, soft sheen, a faint glow from within as if lit by
+    // the light strips), satin silver details, and a dark glass front. Not true see-through: transmission on the body
+    // would show the transparent page behind it and cost phones an extra render pass.
     const purple = new THREE.MeshPhysicalMaterial({
-      color: PALETTE.grape,
-      roughness: 0.28,
+      color: '#a9dcf8',
+      roughness: 0.38,
       clearcoat: 1,
-      clearcoatRoughness: 0.08,
-      sheen: 0.5,
-      sheenColor: new THREE.Color(PALETTE.lavender),
-      envMapIntensity: 0.65,
+      clearcoatRoughness: 0.22,
+      sheen: 0.8,
+      sheenRoughness: 0.4,
+      sheenColor: new THREE.Color('#ffffff'),
+      emissive: new THREE.Color('#5fc4ff'),
+      emissiveIntensity: 0.12,
+      envMapIntensity: 0.75,
     });
     const plum = purple.clone();
-    plum.color = new THREE.Color(PALETTE.plum);
-    const chrome = new THREE.MeshPhysicalMaterial({ color: '#f1f7fd', metalness: 1, roughness: 0.07, clearcoat: 1, envMapIntensity: 1.5 });
-    const dark = new THREE.MeshPhysicalMaterial({ color: PALETTE.ink, roughness: 0.45, clearcoat: 0.5 });
+    plum.color = new THREE.Color('#6cb9f0');
+    plum.emissiveIntensity = 0.08;
+    const chrome = new THREE.MeshPhysicalMaterial({ color: '#e3ebf3', metalness: 1, roughness: 0.2, clearcoat: 1, clearcoatRoughness: 0.15, envMapIntensity: 1.3 });
+    const dark = new THREE.MeshPhysicalMaterial({ color: '#0e1f3a', roughness: 0.1, clearcoat: 1, clearcoatRoughness: 0.03, envMapIntensity: 1.2 });
     const floor = new THREE.MeshPhysicalMaterial({ color: PALETTE.lilac, roughness: 0.4, clearcoat: 0.8 });
-    const knob = new THREE.MeshPhysicalMaterial({ color: PALETTE.blush, roughness: 0.15, clearcoat: 1, sheen: 0.4 });
+    const knob = new THREE.MeshPhysicalMaterial({ color: '#ffffff', roughness: 0.12, clearcoat: 1, sheen: 0.4 });
     const cheapGlass = new THREE.MeshPhysicalMaterial({
       color: '#ffffff',
       transparent: true,
-      opacity: 0.16,
+      opacity: 0.07,
       roughness: 0.03,
       clearcoat: 1,
-      envMapIntensity: 1.6,
+      envMapIntensity: 1.1,
       depthWrite: false,
     });
-    const ball = new THREE.MeshPhysicalMaterial({ roughness: 0.2, clearcoat: 1, clearcoatRoughness: 0.06, sheen: 0.25, envMapIntensity: 0.9 });
-    const cloud = new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 1 });
-    const cloudPink = new THREE.MeshStandardMaterial({ color: PALETTE.blush, roughness: 1 });
+    const ball = new THREE.MeshPhysicalMaterial({
+      roughness: 0.18,
+      clearcoat: 1,
+      clearcoatRoughness: 0.05,
+      sheen: 0.4,
+      sheenColor: new THREE.Color('#ffffff'),
+      iridescence: 0.2,
+      iridescenceIOR: 1.4,
+      envMapIntensity: 1.0,
+    });
+    // Soft baby blue like the sky's clouds and hills (components/sky.tsx).
+    const cloud = new THREE.MeshStandardMaterial({ color: '#d6ecfa', roughness: 1 });
+    const cloudPink = new THREE.MeshStandardMaterial({ color: '#c2e1f7', roughness: 1 });
     return { purple, plum, chrome, dark, floor, knob, cheapGlass, ball, cloud, cloudPink, quality };
   }, [quality]);
 }
@@ -124,42 +141,97 @@ function bentPlane(width: number, height: number, radius: number, segments = 48)
   return g;
 }
 
-/** "Gaballs" wrapped around the front of the base, drawn with the page's Fredoka font into a canvas texture. */
-function NameDecal() {
-  const [texture, setTexture] = useState<THREE.CanvasTexture | null>(null);
-  const geometry = useMemo(() => bentPlane(0.9, 0.15, 1.152), []);
+// ---------------------------------------------------------------------------------------------- light strips
+/**
+ * Glowing light strips (a bright core ring plus a soft additive halo). They breathe slowly while idle, pulse faster
+ * and brighter while a pack is rolling, and flash once as the capsule drops. Two cheap meshes per strip.
+ */
+function LightStrip({ radius, y, segments, phase }: { radius: number; y: number; segments: number; phase: StagePhase }) {
+  const core = useRef<THREE.MeshBasicMaterial>(null);
+  const halo = useRef<THREE.MeshBasicMaterial>(null);
+  useFrame(({ clock }) => {
+    const t = clock.getElapsedTime();
+    const k =
+      phase === 'pending'
+        ? 0.75 + 0.25 * Math.sin(t * 7)
+        : phase === 'dropping'
+          ? 1
+          : 0.6 + 0.12 * Math.sin(t * 1.6);
+    if (core.current) core.current.color.setRGB(0.55 + 0.45 * k, 0.88 + 0.12 * k, 1);
+    if (halo.current) halo.current.opacity = 0.12 + 0.3 * k;
+  });
+  return (
+    <group position={[0, y, 0]} rotation={[Math.PI / 2, 0, 0]}>
+      <mesh>
+        <torusGeometry args={[radius, 0.012, 10, segments]} />
+        <meshBasicMaterial ref={core} color="#bff0ff" toneMapped={false} />
+      </mesh>
+      <mesh>
+        <torusGeometry args={[radius, 0.045, 12, segments]} />
+        <meshBasicMaterial ref={halo} color="#5fd2ff" transparent opacity={0.25} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
+      </mesh>
+    </group>
+  );
+}
+
+/**
+ * Dark glass display strip on the front of the base: "Gaballs" while idle, "Rolling…" while the randomness proof is on
+ * its way, "Enjoy!" when the capsule drops. Drawn with the page's Fredoka font into three canvas textures, once.
+ */
+function Display({ phase }: { phase: StagePhase }) {
+  const [textures, setTextures] = useState<Record<'idle' | 'pending' | 'done', THREE.CanvasTexture> | null>(null);
+  const geometry = useMemo(() => bentPlane(0.78, 0.15, 1.152), []);
   useEffect(() => {
     let cancelled = false;
     const family = getComputedStyle(document.documentElement).getPropertyValue('--font-fredoka').trim() || 'sans-serif';
-    const draw = () => {
+    const make = (text: string) => {
       const c = document.createElement('canvas');
       c.width = 1024;
-      c.height = 178;
-      const ctx = c.getContext('2d');
-      if (!ctx) return;
-      ctx.font = `700 132px ${family}`;
+      c.height = 198;
+      const ctx = c.getContext('2d')!;
+      // the glass strip
+      ctx.fillStyle = 'rgba(10, 24, 48, 0.92)';
+      ctx.beginPath();
+      ctx.roundRect(8, 8, c.width - 16, c.height - 16, 80);
+      ctx.fill();
+      ctx.lineWidth = 6;
+      ctx.strokeStyle = 'rgba(127, 224, 255, 0.55)';
+      ctx.stroke();
+      // glowing text
+      ctx.font = `600 112px ${family}`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.lineJoin = 'round';
-      ctx.lineWidth = 22;
-      ctx.strokeStyle = PALETTE.ink;
-      ctx.strokeText('Gaballs', 512, 96);
-      ctx.fillStyle = PALETTE.blush;
-      ctx.fillText('Gaballs', 512, 96);
+      ctx.shadowColor = '#4fd6ff';
+      ctx.shadowBlur = 28;
+      ctx.fillStyle = '#d6f6ff';
+      ctx.fillText(text, 512, 104);
+      ctx.shadowBlur = 0;
+      ctx.fillText(text, 512, 104);
       const t = new THREE.CanvasTexture(c);
       t.colorSpace = THREE.SRGBColorSpace;
       t.anisotropy = 8;
-      if (!cancelled) setTexture(t);
+      return t;
     };
-    document.fonts.load(`700 132px ${family}`).then(draw, draw);
+    const draw = () => {
+      if (cancelled) return;
+      setTextures({ idle: make('Gaballs'), pending: make('Rolling…'), done: make('Enjoy!') });
+    };
+    document.fonts.load(`600 112px ${family}`).then(draw, draw);
     return () => {
       cancelled = true;
     };
   }, []);
-  if (!texture) return null;
+  useEffect(
+    () => () => {
+      if (textures) Object.values(textures).forEach((t) => t.dispose());
+    },
+    [textures],
+  );
+  if (!textures) return null;
+  const map = phase === 'pending' ? textures.pending : phase === 'idle' ? textures.idle : textures.done;
   return (
     <mesh geometry={geometry} position={[0, 0.135, 0]}>
-      <meshBasicMaterial map={texture} transparent toneMapped={false} />
+      <meshBasicMaterial map={map} transparent toneMapped={false} />
     </mesh>
   );
 }
@@ -172,9 +244,11 @@ function MachineBody({
   flapRef,
   crankable,
   onCrankPointerDown,
+  phase,
 }: {
   mats: Mats;
   segments: number;
+  phase: StagePhase;
   crankRef: React.RefObject<THREE.Group | null>;
   flapRef: React.RefObject<THREE.Group | null>;
   crankable: boolean;
@@ -249,9 +323,13 @@ function MachineBody({
 
   return (
     <group>
-      <mesh geometry={geo.base} material={mats.purple} />
+      {/* frosted acrylic: a slightly deeper base and lid, a lighter body */}
+      <mesh geometry={geo.base} material={mats.plum} />
       <mesh geometry={geo.body} material={mats.purple} />
-      <NameDecal />
+      <Display phase={phase} />
+      {/* light strips: under the glass and around the base */}
+      <LightStrip radius={0.785} y={0.985} segments={segments} phase={phase} />
+      <LightStrip radius={1.118} y={0.215} segments={segments} phase={phase} />
 
       {/* chrome collar + lavender floor the gumballs sit on */}
       <mesh position={[0, COLLAR_Y, 0]} rotation={[Math.PI / 2, 0, 0]} material={mats.chrome}>
@@ -262,7 +340,7 @@ function MachineBody({
       </mesh>
 
       {/* lid + chrome trim + gumball-shaped knob */}
-      <mesh geometry={geo.lid} material={mats.purple} />
+      <mesh geometry={geo.lid} material={mats.plum} />
       <mesh position={[0, DOME_Y + DOME_R - 0.1, 0]} rotation={[Math.PI / 2, 0, 0]} material={mats.chrome}>
         <torusGeometry args={[0.38, 0.022, 12, segments]} />
       </mesh>
@@ -270,8 +348,9 @@ function MachineBody({
         <sphereGeometry args={[0.09, 28, 18]} />
       </mesh>
 
-      {/* front plate */}
-      <RoundedBox args={[0.74, 0.5, 0.14]} radius={0.07} smoothness={5} position={[0, 0.76, 0.795]} material={mats.plum} />
+      {/* dark glass front panel in a thin satin-silver bezel */}
+      <RoundedBox args={[0.77, 0.53, 0.12]} radius={0.08} smoothness={5} position={[0, 0.76, 0.785]} material={mats.chrome} />
+      <RoundedBox args={[0.74, 0.5, 0.14]} radius={0.07} smoothness={5} position={[0, 0.76, 0.795]} material={mats.dark} />
       {/* coin slot */}
       <RoundedBox args={[0.12, 0.16, 0.04]} radius={0.018} smoothness={3} position={[0.255, 0.88, 0.868]} material={mats.chrome} />
       <RoundedBox args={[0.026, 0.1, 0.03]} radius={0.01} smoothness={2} position={[0.255, 0.88, 0.886]} material={mats.dark} />
@@ -311,6 +390,9 @@ function MachineBody({
   );
 }
 
+const FADE_EDGES =
+  'linear-gradient(to bottom, #000 88%, transparent 100%), linear-gradient(to right, transparent 0%, #000 12%, #000 88%, transparent 100%)';
+
 // ---------------------------------------------------------------------------------------------- glass
 /**
  * Fresnel rim: bright at grazing angles, clear when facing the camera. Costs one cheap pass. Writes a matching alpha
@@ -319,7 +401,7 @@ function MachineBody({
 const rimMaterial = new THREE.ShaderMaterial({
   transparent: true,
   depthWrite: false,
-  uniforms: { color: { value: new THREE.Color('#f2f9ff') } },
+  uniforms: { color: { value: new THREE.Color('#2e78c7') } },
   vertexShader: `
     varying vec3 vN; varying vec3 vV;
     void main() {
@@ -332,12 +414,14 @@ const rimMaterial = new THREE.ShaderMaterial({
     uniform vec3 color; varying vec3 vN; varying vec3 vV;
     void main() {
       float f = pow(1.0 - abs(dot(normalize(vN), normalize(vV))), 2.6);
-      gl_FragColor = vec4(color, 0.04 + f * 0.75);
+      gl_FragColor = vec4(color, 0.01 + f * 0.5);
     }`,
 });
 
 function Dome({ mats, quality }: { mats: Mats; quality: Quality }) {
-  const background = useMemo(() => new THREE.Color(PALETTE.sky), []);
+  // What the glass refracts (the canvas is transparent, so the page itself can't be): the pastel sky's colour, so the
+  // dome reads as clear glass on the page. (A colour far from the page's makes it look milky or smoked.)
+  const background = useMemo(() => new THREE.Color('#e3f2fd'), []);
   if (quality === 'low') {
     // Phones: no refraction pass. A faint reflective shell plus a cheap fresnel rim so the dome still reads as glass.
     return (
@@ -367,9 +451,9 @@ function Dome({ mats, quality }: { mats: Mats; quality: Quality }) {
         distortion={0}
         clearcoat={1}
         clearcoatRoughness={0.02}
-        envMapIntensity={1.2}
+        envMapIntensity={0.9}
         color="#ffffff"
-        attenuationColor="#f3f9ff"
+        attenuationColor="#ffffff"
         attenuationDistance={4}
       />
     </mesh>
@@ -447,8 +531,8 @@ function Gumballs({
     const mesh = meshRef.current;
     if (!mesh) return;
     const r = rng(42);
-    // Pastel gumball mix from the brand (brand/README.md): blues plus mint, pink and lavender, so the globe reads as candy.
-    const choices = [PALETTE.grape, PALETTE.lavender, '#7fdcb0', '#f6a8cf', '#b9a0ea', PALETTE.lavender, '#7fdcb0', '#f6a8cf'];
+    // Blue gumball mix: baby blue, sky, ocean, white and a little gold (no pink).
+    const choices = ['#7cc4f2', '#afdff5', '#2e78c7', '#ffffff', '#4a9be0', '#afdff5', '#7cc4f2', '#f5c45e'];
     const goldAt = Math.floor(instances.length * 0.6);
     const c = new THREE.Color();
     for (let i = 0; i < instances.length; i++) {
@@ -767,6 +851,7 @@ function Machine(props: Scene3DProps & { dragging: React.RefObject<boolean> }) {
     <>
       <group ref={group}>
         <MachineBody
+          phase={phase}
           mats={mats}
           segments={segments}
           crankRef={crankRef}
@@ -826,8 +911,8 @@ function FpsProbe({ onFps }: { onFps?: (fps: number) => void }) {
 const studioRoom = (() => {
   const g = new THREE.SphereGeometry(1, 32, 24);
   const pos = g.attributes.position;
-  const low = new THREE.Color('#1f3f6b');
-  const high = new THREE.Color('#e3f2fd');
+  const low = new THREE.Color('#1b3a63');
+  const high = new THREE.Color('#e8f5ff');
   const c = new THREE.Color();
   const colors = new Float32Array(pos.count * 3);
   for (let i = 0; i < pos.count; i++) {
@@ -852,8 +937,8 @@ function Studio({ high }: { high: boolean }) {
       <Lightformer form="rect" intensity={3} position={[0, 6, 0]} rotation-x={Math.PI / 2} scale={[10, 6, 1]} />
       <Lightformer form="rect" intensity={2.2} position={[-5, 2, 2]} rotation-y={Math.PI / 2} scale={[2, 7, 1]} />
       <Lightformer form="rect" intensity={2.2} position={[5, 2, 2]} rotation-y={-Math.PI / 2} scale={[2, 7, 1]} />
-      <Lightformer form="rect" intensity={1.0} color="#ddf0ff" position={[0, 2, 7]} scale={[8, 3, 1]} />
-      <Lightformer form="rect" intensity={0.8} color="#7cc4f2" position={[0, -3, 0]} rotation-x={-Math.PI / 2} scale={[10, 10, 1]} />
+      <Lightformer form="rect" intensity={1.0} color="#e8f5ff" position={[0, 2, 7]} scale={[8, 3, 1]} />
+      <Lightformer form="rect" intensity={0.8} color="#afdff5" position={[0, -3, 0]} rotation-x={-Math.PI / 2} scale={[10, 10, 1]} />
       <Lightformer form="ring" intensity={2.6} color="#ffffff" position={[2.5, 3, 4]} scale={1.2} />
     </Environment>
   );
@@ -942,12 +1027,21 @@ function SceneCanvas({
       dpr={high ? [1, 1.75] : [1, 1.3]}
       gl={{ antialias: true, alpha: true, powerPreference: 'high-performance', toneMapping: THREE.NeutralToneMapping }}
       camera={{ position: VIEWS.default.pos, fov: VIEWS.default.fov, near: 0.1, far: 60 }}
-      style={{ touchAction: 'none', visibility: hidden ? 'hidden' : 'visible' }}
+      style={{
+        touchAction: 'none',
+        visibility: hidden ? 'hidden' : 'visible',
+        // The cloud platform is wider than the view: fade the sides and bottom so it melts into the sky instead of
+        // ending in straight lines.
+        maskImage: FADE_EDGES,
+        WebkitMaskImage: FADE_EDGES,
+        maskComposite: 'intersect',
+        WebkitMaskComposite: 'source-in',
+      }}
     >
       <CameraRig view={props.view ?? 'default'} dragging={dragging} />
-      <hemisphereLight args={['#ddf0ff', '#7cc4f2', 0.5]} />
+      <hemisphereLight args={['#e8f5ff', '#afdff5', 0.5]} />
       <directionalLight position={[3, 5, 4]} intensity={1.2} />
-      <directionalLight position={[-4, 3, -2]} intensity={0.5} color="#afdff5" />
+      <directionalLight position={[-4, 3, -2]} intensity={0.5} color="#9fd3f3" />
       <Studio high={high} />
       <Machine {...props} dragging={dragging} />
       <ContactShadows
@@ -957,7 +1051,7 @@ function SceneCanvas({
         opacity={0.5}
         far={1.2}
         resolution={high ? 512 : 256}
-        color="#2e78c7"
+        color="#5fb3ee"
         frames={1}
       />
       <FpsProbe onFps={props.onFps} />

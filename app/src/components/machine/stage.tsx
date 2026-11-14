@@ -127,7 +127,7 @@ export function MachineStage(props: StageProps) {
         )}
       </div>
       {m?.notice && (
-        <p role="status" className="flex max-w-md items-center gap-2 rounded-2xl bg-white px-3 py-1.5 text-xs font-semibold text-plum shadow-chunky">
+        <p role="status" className="flex max-w-md items-center gap-2 rounded-2xl glass px-3 py-1.5 text-xs font-semibold text-plum shadow-chunky">
           {m.notice}
           <button type="button" className="shrink-0 underline" onClick={dismissNotice}>
             OK
@@ -137,7 +137,7 @@ export function MachineStage(props: StageProps) {
       {/* the mode is only known in the browser: keep the pill's height reserved so nothing shifts when it appears */}
       {!m && <div className="h-7" aria-hidden />}
       {m && (
-        <div className="flex h-7 items-center gap-2 rounded-full bg-white px-3 py-1 text-xs font-semibold text-grape shadow-chunky">
+        <div className="flex h-7 items-center gap-2 rounded-full glass px-3 py-1 text-xs font-semibold text-accent shadow-chunky">
           <span>{show3d ? '3D machine' : `2D machine${m.autoReason && !m.overridden ? ` (${m.autoReason})` : ''}`}</span>
           <button
             type="button"

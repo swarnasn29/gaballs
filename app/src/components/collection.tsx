@@ -63,7 +63,7 @@ export function CollectionCard({ account }: { account: string }) {
       {party && <Confetti pieces={120} duration={4000} />}
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-2xl font-bold">Collection</h2>
-        <p className="font-display text-lg font-semibold text-grape" data-testid="collection-progress">
+        <p className="font-display text-lg font-semibold text-accent" data-testid="collection-progress">
           {c ? `${c.collected} / 4 collected` : 'Loading…'}
         </p>
       </div>
@@ -80,7 +80,7 @@ export function CollectionCard({ account }: { account: string }) {
           return (
             <li
               key={t}
-              className={cx('flex flex-col items-center rounded-2xl p-3 text-center', have ? 'bg-blush' : 'border-2 border-dashed border-lilac bg-white')}
+              className={cx('flex flex-col items-center rounded-2xl p-3 text-center', have ? 'bg-blush' : 'border-2 border-dashed border-lilac glass')}
               data-tier={t}
               data-collected={have ? 'yes' : 'no'}
             >
@@ -99,7 +99,7 @@ export function CollectionCard({ account }: { account: string }) {
               {first && (
                 <p className="text-[11px]">
                   {first.txHash ? (
-                    <a className="font-semibold text-grape underline" href={txUrl(first.txHash)} target="_blank" rel="noreferrer">
+                    <a className="font-semibold text-accent underline" href={txUrl(first.txHash)} target="_blank" rel="noreferrer">
                       first: pull #{first.pullId}
                     </a>
                   ) : (
@@ -122,7 +122,7 @@ export function CollectionCard({ account }: { account: string }) {
           <ul className="mt-2 space-y-2">
             {squads.data!.map((s) => (
               <li key={s.dao} className="flex flex-wrap items-center gap-2" data-testid="squad-trophy">
-                <a className="font-semibold text-grape underline" href={`/squads/${s.dao}`}>
+                <a className="font-semibold text-accent underline" href={`/squads/${s.dao}`}>
                   {s.name}
                 </a>
                 <span className="text-sm text-plum">{s.collection.collected} / 4</span>

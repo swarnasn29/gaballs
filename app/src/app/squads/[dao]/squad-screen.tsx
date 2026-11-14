@@ -97,7 +97,7 @@ export function SquadScreen({ dao }: { dao: string }) {
   if (info.error) {
     return (
       <Card>
-        <h1 className="text-2xl font-bold text-grape">Squad not found</h1>
+        <h1 className="text-2xl font-bold text-accent">Squad not found</h1>
         <p className="mt-2">
           {dao} is not a Sputnik DAO we can read ({info.error.slice(0, 120)}). Check the name, or create it on the Squads
           page.
@@ -136,7 +136,7 @@ export function SquadScreen({ dao }: { dao: string }) {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="text-xs font-bold uppercase tracking-wide text-plum">Squad · Sputnik DAO</p>
-            <h1 className="text-3xl font-bold text-grape sm:text-4xl">{info.data?.config.name ?? '…'}</h1>
+            <h1 className="text-3xl font-bold text-accent sm:text-4xl">{info.data?.config.name ?? '…'}</h1>
             <a className="break-all text-sm font-semibold text-plum underline" href={accountUrl(dao)} target="_blank" rel="noreferrer">
               {dao} on nearblocks
             </a>
@@ -149,7 +149,7 @@ export function SquadScreen({ dao }: { dao: string }) {
         </div>
         <ul className="flex flex-wrap gap-2" aria-label="Members">
           {members.map((m) => (
-            <li key={m} className="rounded-full bg-blush px-3 py-1 text-sm font-semibold text-grape ring-1 ring-lilac">
+            <li key={m} className="rounded-full bg-blush px-3 py-1 text-sm font-semibold text-accent ring-1 ring-lilac">
               {shortAccount(m)}
               {m === account && <span className="ml-1 rounded-full bg-grape px-1.5 text-[10px] text-white">you</span>}
             </li>
@@ -163,7 +163,7 @@ export function SquadScreen({ dao }: { dao: string }) {
                 inputMode="decimal"
                 value={chip}
                 onChange={(e) => setChip(e.target.value)}
-                className="w-28 rounded-2xl border-2 border-lilac bg-white px-3 py-2 font-normal tabular-nums"
+                className="w-28 rounded-2xl border-2 border-lilac glass px-3 py-2 font-normal tabular-nums"
               />
             </label>
             <Button type="submit" variant="secondary" disabled={busy} className="min-h-11 py-2 text-base">

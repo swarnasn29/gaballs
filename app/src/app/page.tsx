@@ -40,13 +40,13 @@ async function Machines() {
       )}
       {legacy.length > 0 && (
         <details className="group flex flex-col gap-4">
-          <summary className="flex w-fit cursor-pointer list-none items-center gap-2 rounded-full bg-white px-4 py-2 font-display text-lg font-semibold text-plum shadow-chunky [&::-webkit-details-marker]:hidden">
+          <summary className="flex w-fit cursor-pointer list-none items-center gap-2 rounded-full glass px-4 py-2 font-display text-lg font-semibold text-plum shadow-chunky [&::-webkit-details-marker]:hidden">
             <span className="inline-block transition-transform group-open:rotate-90" aria-hidden>
               ▸
             </span>
             Legacy machines · {legacy.length}
           </summary>
-          <p className="mt-3 max-w-2xl rounded-2xl bg-white/80 px-4 py-2 text-sm text-plum">
+          <p className="mt-3 max-w-2xl rounded-2xl glass px-4 py-2 text-sm text-plum">
             Launched with earlier machine code. Machines have no keys, so they can never be upgraded: v1 machines use block
             randomness and have no sell-back; the first VRF version cannot be played by squads.
           </p>
@@ -64,16 +64,25 @@ async function Machines() {
 export default function Home() {
   return (
     <div className="flex flex-col gap-6">
-      <Card className="max-w-2xl">
-        <h1 className="text-4xl font-bold text-grape sm:text-5xl">Gumball machines for memecoins</h1>
-        <p className="mt-2 text-lg">
-          Every 10 USDT pack is a market buy of the machine&apos;s coin. A fixed, public odds table then multiplies what
-          you get: 0.7× up to 8×. The creator&apos;s Machine NFT earns 0.5% of every pack.
+      {/* On a white card, so the text stays readable over the castles, coins and stars. */}
+      <div className="glass max-w-xl rounded-[2rem] p-6 shadow-chunky sm:my-8 sm:p-8">
+        <h1 className="text-4xl font-bold text-ink sm:text-6xl">
+          Gumball machines for memecoins
+        </h1>
+        <p className="mt-4 text-lg leading-relaxed text-plum sm:text-xl">
+          Every pack is a market buy of the machine&apos;s coin, from 10 to 1,000 USDT. A fixed, public odds table then
+          multiplies what you get: 0.7× up to 8×. The creator&apos;s Machine NFT earns 0.5% of every pack.
         </p>
-      </Card>
+        <a
+          href="#machines-h"
+          className="mt-6 inline-flex min-h-12 items-center rounded-full bg-gold px-6 py-3 font-display text-lg font-semibold text-ink-dark transition-transform active:translate-y-1"
+        >
+          Pick a machine
+        </a>
+      </div>
 
-      <section aria-labelledby="machines-h" className="flex flex-col gap-4">
-        <h2 id="machines-h" className="w-fit rounded-full bg-white px-4 py-1 text-2xl font-bold text-grape shadow-chunky">
+      <section aria-labelledby="machines-h" className="flex scroll-mt-6 flex-col gap-4">
+        <h2 id="machines-h" className="w-fit rounded-full glass px-4 py-1 text-2xl font-bold text-ink shadow-chunky">
           Machines
         </h2>
         <Suspense fallback={<Card aria-busy>Loading machines from {factory.id}…</Card>}>

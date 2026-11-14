@@ -46,7 +46,7 @@ export function OddsTable({ odds, machineId }: { odds: OddsView; machineId: stri
       </table>
       <p className="mt-2 text-xs text-ink">
         Expected: {fmtMultiplier(odds.expected_multiplier_bps)} of the tokens a pack buys.{' '}
-        <Link className="font-semibold text-grape underline" href={`/raw?contract=${machineId}&method=get_odds&args={}`}>
+        <Link className="font-semibold text-accent underline" href={`/raw?contract=${machineId}&method=get_odds&args={}`}>
           source: get_odds()
         </Link>
       </p>
@@ -56,7 +56,7 @@ export function OddsTable({ odds, machineId }: { odds: OddsView; machineId: stri
 
 export function RiskNotice() {
   return (
-    <p role="note" className="rounded-2xl border-2 border-warn/40 bg-[#fff6dd] p-3 text-sm text-ink">
+    <p role="note" className="rounded-2xl border-2 border-warn/50 bg-warn/10 p-3 text-sm text-ink">
       <strong className="font-bold">Risk notice:</strong> testnet only, mock USDT has no value. On average a pack pays
       back 0.955× the tokens it buys; flipping straight back returns about 94% of the USDT. Memecoin prices move both
       ways. Early big winners may have to wait to sell.
@@ -115,7 +115,7 @@ export function MachineCard({
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={art.characters.mascot} alt="" width={56} height={70} className="shrink-0" />
         <div className="min-w-0">
-          <h2 className="truncate text-2xl font-bold text-grape">{info.name}</h2>
+          <h2 className="truncate text-2xl font-bold text-accent">{info.name}</h2>
           <p className="truncate text-sm font-semibold text-plum">
             ${info.symbol} · {id}
           </p>

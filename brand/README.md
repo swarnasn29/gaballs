@@ -34,8 +34,8 @@ Main blue is the blue gumball measured from the character art (`#AFDFF5`); the o
 | --- | --- | --- |
 | `wordmark.png` | 1400×420, transparent | Logo on any background |
 | `wordmark-on-sky.png` | 1400×420 | Logo on the sky colour |
-| `icon-512.png` | 512×512, transparent corners | App icon, avatars |
-| `icon-192.png`, `apple-icon-180.png`, `favicon-32.png`, `favicon-16.png`, `favicon.ico` | small | Site icons |
+| `icon-512.png` | 512×512, transparent | App icon, avatars: the blue gumball with glowing eyes (`source/icon-source.webp`) |
+| `icon-192.png`, `apple-icon-180.png`, `favicon-32.png`, `favicon-16.png`, `favicon.ico` | small | Site icons (the Apple icon sits on Sky #DDF0FF, since iOS fills transparency with black) |
 | `og-1200x630.png` | 1200×630 | Link preview (X, Telegram, Discord) |
 | `x-banner-1500x500.png` | 1500×500 | X header / demo post image |
 

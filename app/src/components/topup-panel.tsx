@@ -78,7 +78,7 @@ export function TopUpPanel({ account }: { account: string }) {
         <label className="flex flex-col gap-1 text-sm font-bold">
           Pay with
           <select
-            className="rounded-2xl border-2 border-lilac bg-white px-3 py-2 font-normal"
+            className="rounded-2xl border-2 border-lilac glass px-3 py-2 font-normal"
             value={pay?.assetId ?? ''}
             onChange={(e) => {
               setAssetId(e.target.value);
@@ -107,7 +107,7 @@ export function TopUpPanel({ account }: { account: string }) {
               }}
               className={cx(
                 'h-11 w-11 rounded-full font-display text-lg font-semibold ring-2',
-                count === n ? 'bg-grape text-white ring-grape' : 'bg-blush text-grape ring-lilac',
+                count === n ? 'bg-grape text-white ring-grape' : 'bg-blush text-accent ring-lilac',
               )}
             >
               {n}
@@ -131,7 +131,7 @@ export function TopUpPanel({ account }: { account: string }) {
               }}
               placeholder="name.near"
               aria-invalid={typed !== '' && !recipientOk}
-              className="rounded-2xl border-2 border-lilac bg-white px-3 py-2 font-normal"
+              className="rounded-2xl border-2 border-lilac glass px-3 py-2 font-normal"
             />
             <span className="text-xs font-normal text-plum">{account} is a testnet name, so it does not exist on mainnet.</span>
           </label>
@@ -144,7 +144,7 @@ export function TopUpPanel({ account }: { account: string }) {
             label="You pay"
             value={q ? `${Number(q.amountInFormatted).toPrecision(6).replace(/\.?0+$/, '')} ${pay?.symbol}` : '…'}
             source={{ href: QUOTE_DOCS, label: '1Click quote (dry)' }}
-            className="col-span-2 bg-white ring-4 ring-grape"
+            className="col-span-2 glass ring-4 ring-grape"
           />
           <Stat label="Worth" value={q ? usd(q.amountInUsd) : '…'} source={{ href: QUOTE_DOCS, label: 'amountInUsd' }} />
           <Stat label="Arrives in" value={q ? `~${q.timeEstimate < 120 ? `${q.timeEstimate} s` : `${Math.round(q.timeEstimate / 60)} min`}` : '…'} source={{ href: QUOTE_DOCS, label: 'timeEstimate' }} />
@@ -174,7 +174,7 @@ export function TopUpPanel({ account }: { account: string }) {
           </Button>
           {real && 'error' in real && <p className="mt-2 text-sm font-semibold text-bad">{real.error}</p>}
           {deposit?.depositAddress && real && 'label' in real && (
-            <div className="mt-3 flex flex-col gap-1 rounded-2xl bg-white p-3 text-sm" data-testid="topup-deposit">
+            <div className="mt-3 flex flex-col gap-1 rounded-2xl glass p-3 text-sm" data-testid="topup-deposit">
               <p>
                 Send <b>{deposit.amountInFormatted} {real.label}</b> to:
               </p>
@@ -191,7 +191,7 @@ export function TopUpPanel({ account }: { account: string }) {
               <p className="mt-1">
                 Status:{' '}
                 <b>{track.data ? STATUS_TEXT[track.data] : track.error ? `unavailable (${track.error})` : 'checking…'}</b>{' '}
-                <a className="text-[11px] font-semibold text-grape underline" href={STATUS_DOCS} target="_blank" rel="noreferrer">
+                <a className="text-[11px] font-semibold text-accent underline" href={STATUS_DOCS} target="_blank" rel="noreferrer">
                   source: 1Click status
                 </a>
               </p>

@@ -105,7 +105,7 @@ export function ProposalList({
                 ))}
               </ul>
               <div className="flex items-center gap-2">
-                <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-white" aria-hidden>
+                <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-white/15" aria-hidden>
                   <div className="h-full rounded-full bg-grape transition-[width]" style={{ width: `${Math.min(100, (yes / Math.max(1, needed)) * 100)}%` }} />
                 </div>
                 <span className="text-sm font-semibold tabular-nums">
@@ -130,14 +130,14 @@ export function ProposalList({
                 </div>
               )}
               {busy === 'approve' && deciding && d.kind === 'open' && (
-                <p className="text-sm text-grape">
+                <p className="text-sm text-accent">
                   Your vote executes it: the squad pays, then the machine waits for a verifiable randomness proof (about a
                   minute). The reveal appears above for the whole squad when it settles.
                 </p>
               )}
-              {mine && <p className="text-xs font-semibold text-grape">You voted: {mine}</p>}
+              {mine && <p className="text-xs font-semibold text-accent">You voted: {mine}</p>}
               {txs[p.id]?.hash && (
-                <a className="text-sm font-semibold text-grape underline" href={txUrl(txs[p.id].hash!)} target="_blank" rel="noreferrer">
+                <a className="text-sm font-semibold text-accent underline" href={txUrl(txs[p.id].hash!)} target="_blank" rel="noreferrer">
                   View your vote transaction
                 </a>
               )}
