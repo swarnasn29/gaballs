@@ -1,62 +1,34 @@
 # Gaballs
 
-A gacha launchpad on NEAR. A creator launches a memecoin together with a gacha machine. Every 10 USDT pack is a
-market buy of that coin on the machine's own bonding curve; a random draw from a fixed, public odds table then
-multiplies what the buyer receives. Commons feed a prize vault; Rare/Epic/Mythic pulls draw from it. The creator
+A gacha launchpad on NEAR. A creator launches a memecoin together with a gacha machine. Every pack (10 USDT, or any
+size from 10 to 1,000 USDT on newer machines) is a market buy of that coin on the machine's own bonding curve; a
+random draw from a fixed, public odds table then multiplies what the buyer receives. Commons feed a prize vault; Rare/Epic/Mythic pulls draw from it. The creator
 holds a transferable Machine Ownership NFT that accrues creator fees in its own balance.
 
 Built at NEAR HACKATHON 2026. Tracks: `memecoins` (primary), `nfts`, `social`, `games`.
 
 | Track | What in this repo fits it | Where |
 | --- | --- | --- |
-| `memecoins` | Every launch is a NEP-141 coin whose only way in is a gacha pack: a market buy on its own bonding curve, multiplied by a fixed public odds table, with a prize vault fed by Commons. No admin can change odds, curve or fees after launch. | §2, §3, §4 |
-| `nfts` | The Machine Ownership NFT holds money: creator fees accrue in the NFT's own balance, move with it on transfer, and only the current owner can claim. Mythic pulls mint soulbound certificates. | §4, [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md) |
-| `social` | Squads: a Sputnik DAO v2 opens packs, splits prizes and co-owns a Machine NFT by vote. | [Social Money: Squads](#social-money-squads) |
+| `memecoins` | Every launch is a NEP-141 coin whose only way in is a gacha pack: a market buy on its own bonding curve, multiplied by a fixed public odds table, with a prize vault fed by Commons. No admin can change odds, curve or fees after launch. | §1, §2, §3 |
+| `nfts` | The Machine Ownership NFT holds money: creator fees accrue in the NFT's own balance, move with it on transfer, and only the current owner can claim. Mythic pulls mint soulbound certificates. | §3, [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md) |
+| `social` | Squads: a Sputnik DAO v2 opens packs, splits prizes and co-owns a Machine NFT by vote. | [§4](#4-social-money-squads) |
 | `games` | The game loop (pull → reveal → Collection → sell) runs for a Google/email player with no wallet, no seed phrase and no wallet popups; MetaMask players get an `0x` NEAR account. | [§5](#5-no-wallet-needed), [§6](#6-the-game-loop) |
+
+**Demo video (1:34):** [docs/proof/gaballs-demo.mp4](docs/proof/gaballs-demo.mp4), recorded on the live testnet app.
 
 **Live app (testnet):** https://gaballs.vercel.app. Sign in with Google/email (no wallet needed), MetaMask, or any NEAR
 wallet; get free mock USDT on "My stuff". Everything is on NEAR **testnet**; mock USDT is not real money.
 
-## 1. What to check in 5 minutes (judge quick path)
-
-The commands use [near-cli-rs](https://github.com/near/near-cli-rs) (`npm i -g near-cli-rs`); no account is needed for
-steps 1–4.
-
-1. **Odds are fixed and public.** `near contract call-function as-read-only gaballs.gaballs.testnet get_odds json-args '{}' network-config testnet now`
-   → Common 7500 bps × 7000, Rare 2000 × 12500, Epic 400 × 25000, Mythic 100 × 80000, `expected_multiplier_bps: 9550`.
-2. **Nobody can change the machine.** `near account list-keys gaballs.gaballs.testnet network-config testnet now`
-   → an empty table (no access keys, so no upgrade and no owner calls). Same for the squad DAO
-   `gaballs-squad.sputnikv2.testnet`.
-3. **Every pull is on-chain with its randomness proof.** `near contract call-function as-read-only gaballs.gaballs.testnet get_recent_pulls json-args '{}' network-config testnet now`
-   → the last 50 pulls, each with `tier`, `roll`, `vrf_alpha`, `vrf_signature`. [§9](#9-verify-the-trust-claims) shows how to re-check one.
-4. **The no-wallet welcome kit is live and limited.** `curl -s https://gaballs.vercel.app/api/welcome`
-   → `{"on":true,"balanceNear":…,"kitsToday":…,"limits":{"kitNear":0.5,"perDay":15,"perIpPerDay":3,"offBelowNear":1}}`.
-5. **Play without a wallet** (needs an email inbox, ~3 minutes). Open https://gaballs.vercel.app → **Connect wallet** →
-   **Continue with Google / email** → enter the code Privy emails you → a "You're in!" box lists three welcome-kit
-   transactions → **My stuff** → **Get 100 mock USDT** → **Machines** → **Play** on the Gaballs card → **Open 1 pack** → after about a
-   minute the capsule drops and the reveal shows your tier, tokens and a "Verifiable randomness proof" link. No wallet
-   window opens at any point. Then **My stuff** shows your **Collection** (your tier filled in, "1 / 4 collected") and a **Sell** button.
-   Recorded proof of the same path: [§6](#6-the-game-loop).
-6. **Top up from any chain (NEAR Intents, mainnet quote).** On **My stuff**, "Top up from any chain" shows a live
-   1Click quote, e.g. 10.097 USDC on Base for exactly 10 USDT on NEAR mainnet. Same quote from a terminal: [§7](#7-top-up-from-any-chain-near-intents).
-7. **Squads.** **Squads** → **Gaballs Squad**: the DAO's proposals that opened 5 packs, split the prize, sold the rest and
-   claimed Machine NFT fees, each linked to its transaction. Table: [Social Money: Squads](#social-money-squads).
-8. **Pick your pack size (10–1,000 USDT).** `near contract call-function as-read-only gbmax.gaballs.testnet quote_pack_amount json-args '{"amount":"1000000000"}' network-config testnet now`
-   → `bought`, `expected_payout`, `max_payout` and `max_payout_capped: true` (a 1,000 USDT Mythic on this young
-   machine is held to the 25% vault cap). `get_recent_pulls` on `gbmax.gaballs.testnet` shows pulls with `usdt_in`
-   75000000 and 37500000: one pack each, at the size paid. On the site, **Gaballs Max** has a pack-size slider; the
-   numbers under it are the same as this view. Transactions: [docs/DEPLOYMENTS.md](docs/DEPLOYMENTS.md) "Variable pack size".
-
-## 2. Problem and mechanic
+## 1. Problem and mechanic
 
 Memecoin launches are a race to buy first and a chart to watch; there is nothing to *do* with the coin. Gaballs turns
 buying into a game with rules anyone can read:
 
 - A creator launches a coin and its gacha machine in one transaction (`gaballs.testnet` → `launch()`); the machine *is*
   the coin's contract.
-- A pack costs 10 USDT; on machines launched from 2026-11-14 the buyer picks any size from 10 to 1,000 USDT (one
+- A pack costs 10 USDT; on machines launched from 2026-11-13 the buyer picks any size from 10 to 1,000 USDT (one
   draw, same odds). The USDT buys the coin on the machine's own bonding curve, so every pack moves the price.
-- A verifiable random draw (OutLayer VRF, checked on-chain) picks a tier from the fixed table in §3 and multiplies the
+- A verifiable random draw (OutLayer VRF, checked on-chain) picks a tier from the fixed table in §2 and multiplies the
   tokens bought. Commons (0.7×) leave 30% of their tokens in a prize vault; Rare/Epic/Mythic pulls take their extra
   from that vault, capped at 25% of it per pull.
 - On average a pack pays back 0.955× the tokens it buys; the 4.5% difference fills the vault. Tokens can be sold back
@@ -64,7 +36,7 @@ buying into a game with rules anyone can read:
 - The creator's Machine NFT collects 0.5% of every pack (0.2% goes to the platform). Sell the NFT and its unclaimed
   fees go with it.
 
-## 3. Economics (fixed at launch, readable on-chain)
+## 2. Economics (fixed at launch, readable on-chain)
 
 | Tier | Chance | Multiplier |
 | --- | --- | --- |
@@ -76,7 +48,7 @@ buying into a game with rules anyone can read:
 Chosen curve / vault / cap parameters and the simulation behind them: [docs/PARAMETERS.md](docs/PARAMETERS.md).
 Re-run the simulation: see [sim/README.md](sim/README.md).
 
-## 4. Architecture
+## 3. Architecture
 
 | Contract | Testnet account | Source | What it does |
 | --- | --- | --- | --- |
@@ -87,7 +59,7 @@ Re-run the simulation: see [sim/README.md](sim/README.md).
 | Welcome kit (app server, not a contract) | `gaballs-welcome.testnet` | `app/src/server/welcome.ts` | Pays gas and token registration for new Google/email and MetaMask players (§5) |
 | OutLayer (external, not ours) | `outlayer.testnet`, project `zavodil2.testnet/vrf-ark` | [out-layer/vrf-example](https://github.com/out-layer/vrf-example) | Runs the VRF module; returns an Ed25519 signature over `vrf:{request_id}:{buyer}:{seed}` |
 
-Code hashes and every deployment transaction: [docs/DEPLOYMENTS.md](docs/DEPLOYMENTS.md). Flagship parameters (read
+Code hashes and every deployment transaction (with nearblocks links): [docs/DEPLOYMENTS.md](docs/DEPLOYMENTS.md). Flagship parameters (read
 with `get_machine`): pack 10 USDT (newer machines such as `gbmax.gaballs.testnet`: any size from 10 to 1,000 USDT,
 `config.max_pack_price`), V = 3,000 USDT, vault seed 100M, creator allocation 100M, curve 800M, cap 25%,
 fees 0.5% + 0.2%, VRF timeout 300 blocks.
@@ -126,7 +98,7 @@ Anyone can launch a machine, so the list can also hold machines launched by othe
 The current machine accepts a proof signed by any account as long as it carries this pull's unique seed; why that is
 safe is in [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md).
 
-## Social Money: Squads
+## 4. Social Money: Squads
 
 **Built on Sputnik DAO (`sputnikv2.testnet`), no custom multisig.** A squad is a standard Sputnik DAO v2 whose council
 is its members: they chip in USDT, vote on FunctionCall proposals to open packs on the flagship machine, and split the
@@ -190,14 +162,9 @@ Check: `curl -sI https://gaballs.vercel.app/ | grep -i frame`.
 Why 0.5 NEAR: a pack attaches 300 Tgas, and NEAR holds that gas at a pessimistic price (~0.30 NEAR) before running;
 most is refunded, a pack really costs ~0.002–0.01 NEAR.
 
-**MetaMask notes.** Two app-side fixes, found in `evm-on-near.dev`'s own code: its wallet picker asks MetaMask to
-*switch* to NEAR Protocol Testnet (chain 398) and gives up if MetaMask does not know it, so the dialog first adds the
-chain ("Step 1 of 2", same parameters as the sign page); and it refuses any action above 270 Tgas, so transactions sent
-through that wallet are capped at 270 Tgas (squad packs already use 270 Tgas on testnet).
-
-**Why not NEAR Auth.** We tried NEAR Auth (fast-auth) first. Its shared testnet client accepts only an
-`http://localhost:3000` callback and needs an Auth0 window for every signature, so it could neither run on the live
-site nor give a popup-free loop. Privy signs silently.
+**MetaMask notes.** The dialog adds NEAR Protocol Testnet (chain 398) to MetaMask before sign-in, and transactions
+through that wallet are capped at 270 Tgas (the sign page's limit). We tried NEAR Auth (fast-auth) first; its shared
+testnet client only accepts a localhost callback and opens a window for every signature, so we use Privy.
 
 Proof (all links in [docs/DEPLOYMENTS.md](docs/DEPLOYMENTS.md)):
 
@@ -219,11 +186,20 @@ Where the Collection comes from (`app/src/lib/collection.ts`): the player's `pac
 history finds the transactions, NEAR RPC returns their logs; the VRF settlement runs inside the buyer's transaction),
 merged with `get_recent_pulls` on every machine, keyed by machine and pull id.
 
+**Play it without a wallet** (needs an email inbox, ~3 minutes):
+
+1. Open https://gaballs.vercel.app → **Connect wallet** → **Continue with Google / email** → enter the code Privy
+   emails you → a "You're in!" box lists three welcome-kit transactions.
+2. **My stuff** → **Get 100 mock USDT**.
+3. **Machines** → **Play** on a machine card → open a pack → after about a minute the capsule drops and the reveal
+   shows your tier, tokens and a "Verifiable randomness proof" link. No wallet window opens at any point.
+4. **My stuff** shows your **Collection** (your tier filled in, "1 / 4 collected") and a **Sell** button.
+
 **No-popup proof, recorded with Playwright.** `app/e2e/no-popup-loop.spec.ts` plays the loop as a Google/email player
 (login → open 1 pack → reveal → Collection → sell all) and **fails if any extra window, tab or browser dialog opens**.
 Run it (needs a Privy test login in `app/.env.local`: `PRIVY_TEST_EMAIL`, `PRIVY_TEST_OTP`, from Privy dashboard →
-User management → test accounts): `cd app && npx playwright test --headed` → `1 passed`. Output: video and
-screenshots in [docs/proof/game-loop/](docs/proof/game-loop/). A passing run on 2026-11-12: pack
+User management → test accounts): `cd app && npx playwright test --headed` → `1 passed`; it writes a video and
+screenshots to `docs/proof/game-loop/` (not committed: they show the test login). A passing run on 2026-11-12: pack
 [6u3v6h8B…](https://testnet.nearblocks.io/txns/6u3v6h8B4hhsRi2ADuG6vVGK9LTCoPzyAhyUNAVgLWvB) (Common, 0.7×,
 1.54M GABALLS), sell [9gPAcQhc…](https://testnet.nearblocks.io/txns/9gPAcQhcve9w8kVKNAZcerKdDiCBASmseg4qzRuNupem),
 0 extra windows.
@@ -242,7 +218,7 @@ NEAR Intents has no testnet (hackathon rules Q-007), so this is the mainnet path
   (`refundType: INTENTS`), so no refund address on the paying chain is needed.
 - Step 2, behind an "I understand: mainnet, real money" tick, asks for a real deposit address and tracks
   `GET /v0/status`. Gaballs never sends funds; the player would send from their own wallet. **Not exercised with real
-  funds.** No API key is used, so 1Click adds 0.25% (included in the quote).
+  funds.** No API key (JWT) is used, so 1Click adds its 0.2% fee (included in the quote).
 
 Same quote from a terminal (dry run; any NEAR mainnet account as recipient):
 
@@ -290,22 +266,15 @@ Deployed with the Vercel CLI from `app/` (`vercel deploy --prod`). Vercel holds 
 variable, read only by the server route `app/src/app/api/welcome/route.ts`. `app/.vercelignore` keeps `.env*` and test
 output from being uploaded. Check the live build: `curl -s -o /dev/null -w '%{http_code}' -X POST https://gaballs.vercel.app/api/dev-signer` → `404`.
 
-**Performance (Lighthouse 12.8 mobile, measured 2026-11-11).** Home, Launch and My stuff score 86–93 (median) on the
-live site. The machine page scores a median of ~71 in Lighthouse's default *simulated* mode and 83–94 with real
-(DevTools) 4× CPU throttling; layout shift is 0.001. The simulated gap comes from one ~0.4 s task that only appears
-while Lighthouse traces the page: the same page under Lighthouse's phone emulation in plain Chrome has no task over
-50 ms. On phones (small touch screens) the machine starts in 2D; "Switch to 3D" loads the 3D engine (~1 MB).
+**Performance.** On phones (small touch screens) the machine starts in 2D; "Switch to 3D" loads the 3D engine
+(~1 MB). `app/scripts/fps-check.mjs` measures the frame rate on desktop and on a throttled phone profile.
 
 Self-check scripts (`app/scripts/`): `screens.mjs` (390/1440 screenshots + styling checks), `machine-stills.mjs`
 (3D stills), `record-pull.mjs` (records a real testnet pull), `fps-check.mjs` (frame rate, desktop and throttled phone).
 
-**Dev test signer (local automation only).** With `DEV_SIGNER=1` in `app/.env.local` and `npm run dev:signer`
-(listens on 127.0.0.1 only), the app can sign as a test account using its key from `~/.near-credentials`; the key
-stays on the local server and is never sent to the browser, and a striped "DEV SIGNER" banner is always shown.
-All three are required: `npm run dev:signer` sets a launcher-only flag, so plain `npm run dev` keeps the signer off
-(`/api/dev-signer` returns 404) even when `DEV_SIGNER=1` is in `.env.local`.
-Production builds don't contain it: `.dev.ts(x)` files are only routes in that mode, the browser import resolves to an
-empty stub, and the post-build check fails the build if any trace remains.
+**Dev test signer (local automation only).** `npm run dev:signer` can sign as a local test account for automated
+checks; production builds contain none of it (`npm run build` fails if any trace remains, see step 3 above, and the
+live `/api/dev-signer` returns `404`).
 
 ## 9. Verify the trust claims
 
@@ -315,10 +284,11 @@ empty stub, and the post-build check fails the build if any trace remains.
 | All launch parameters are public | `near contract call-function as-read-only gaballs.gaballs.testnet get_machine json-args '{}' network-config testnet now` | `config` (pack price, V, cap, fees, VRF key) and live curve, vault and totals |
 | The machine can't be upgraded or changed | `near account list-keys gaballs.gaballs.testnet network-config testnet now` | an empty table; there are no owner methods that change economics (`contracts/machine/src/lib.rs`) |
 | The machine runs the factory's code | `near contract call-function as-read-only gaballs.testnet get_config json-args '{}' network-config testnet now`, then `near account view-account-summary gbmax.gaballs.testnet network-config testnet now` | `machine_code_sha256` = `f8a79bab…cde5` (the variable-pack-size code), the same as Gaballs Max's contract checksum. The flagship `gaballs.gaballs.testnet` shows `a43447c8…5935`, the factory's code when it was launched; both hashes are in [docs/DEPLOYMENTS.md](docs/DEPLOYMENTS.md) |
+| Any pack size from 10 to 1,000 USDT, vault cap enforced | `near contract call-function as-read-only gbmax.gaballs.testnet quote_pack_amount json-args '{"amount":"1000000000"}' network-config testnet now` | `bought`, `expected_payout`, `max_payout` and `max_payout_capped: true` (a 1,000 USDT Mythic on this young machine is held to the 25% vault cap) |
 | A squad is a plain Sputnik DAO | `near account list-keys gaballs-squad.sputnikv2.testnet network-config testnet now` | an empty table; `get_policy` shows the council and the 2-of-3 threshold |
 | The welcome kit is limited | `curl -s https://gaballs.vercel.app/api/welcome` | `limits`: 0.5 NEAR per kit, 15 per day, 3 per IP per day, off below 1 NEAR |
 
-The factory, NFT and mock USDT accounts still have one key each until the Phase 7 lock-down (§13).
+The factory, NFT and mock USDT accounts still have one full-access key each (see Known limits in §10).
 
 **Check a pull's randomness yourself** (on the flagship machine `gaballs.gaballs.testnet`, or any VRF machine):
 
@@ -332,11 +302,7 @@ The factory, NFT and mock USDT accounts still have one key each until the Phase 
 
 Or open the pull's "Verifiable randomness proof" link in the app, which runs the same checks in the browser.
 
-## 10. Deployments and transaction links
-
-See [docs/DEPLOYMENTS.md](docs/DEPLOYMENTS.md).
-
-## 11. Security notes and known limits
+## 10. Security notes and known limits
 
 Threat model for the Machine NFT (every way a seller could try to keep the fees) and for the VRF check:
 [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md).
@@ -370,10 +336,13 @@ Known limits:
 - MetaMask users need NEAR Protocol Testnet (chain 398) in MetaMask; the app adds it. Their transactions are capped at
   270 Tgas, which packs, sells and claims fit.
 - Squad "open packs" needs 270 Tgas on the vote that executes it; Sputnik's vote gas limit leaves little room.
+- The factory (`gaballs.testnet`), NFT (`nft.gaballs.testnet`) and mock USDT (`usdt.gaballs.testnet`) accounts still
+  hold one full-access key each, so they could still be upgraded. The machines themselves (every
+  `<symbol>.gaballs.testnet`) and the squad DAO have no keys and cannot be changed.
 - No reproducible (Docker) contract build; wasm hashes are listed for comparison.
 - Legacy machines run older code (v1 has no VRF and no sell-back).
 
-## 12. Built with
+## 11. Built with
 
 - near-sdk 5.30.1 and near-contract-standards 5.30.1 (NEP-141/145/148 implementation) — contracts
 - uint 0.10.2 — 256-bit integers for the curve maths
@@ -405,19 +374,18 @@ Known limits:
 - Artwork: the Gaballs icon (`brand/source/icon-source.webp`) and the character and scene references in
   `brand/source/` were provided by the team; the site's background scene, the 3D machine and the 2D machine are drawn in
   code (`app/src/components/sky.tsx`, `app/src/components/machine/`)
+- Demo video: voiceover generated with ElevenLabs (voice "Sia", model eleven_v4); background music and confetti
+  composed in code (numpy); screen recordings with Playwright and an FFmpeg screen capture; edited with FFmpeg. The
+  video-making scripts are kept outside this repository.
 - AI-assisted: code in this repository was written with Claude Code (Anthropic)
 
-## 13. Phase 7 checklist (before submission — not done yet)
+## 12. Built during the hackathon
 
-Only after the README steps above have been verified on a fresh clone. Each step is irreversible and needs a yes:
+Everything in this repository was written during NEAR HACKATHON 2026. There is no pre-hackathon code: the first commit,
+[`4b2b845`](https://github.com/swarnasn29/gaballs/commit/4b2b845) ("Phase 0: repo scaffold…"), is from 2026-11-10,
+inside the build window. Full history: [commits on `main`](https://github.com/swarnasn29/gaballs/commits/main).
+Libraries, templates and AI-generated code are listed in §11.
 
-- [ ] Delete the full-access key on `gaballs.testnet` (factory). The factory's owner *is* `gaballs.testnet`, so this
-      alone makes `set_machine_code` and `set_vrf_config` uncallable forever; `launch()` stays open to everyone.
-- [ ] Delete the key on `nft.gaballs.testnet` (no owner setters: mint is factory-only, claim is token-owner-only).
-- [ ] Delete the key on `usdt.gaballs.testnet` (no owner methods; `faucet()` keeps working).
-- [ ] Decide on `platform.gaballs.testnet` (a plain account that only receives platform fees).
-- [ ] Add the transactions to docs/DEPLOYMENTS.md and the `list-keys` checks for these accounts to §9.
-
-## 14. License
+## 13. License
 
 MIT — see [LICENSE](LICENSE).
