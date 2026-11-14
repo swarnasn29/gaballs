@@ -1,4 +1,17 @@
-# Gaballs
+<p align="center">
+  <img src="app/public/art/brand/icon.png" width="132" alt="gaBalls icon">
+</p>
+<h1 align="center">gaBalls</h1>
+<p align="center">
+  <b>Gumball machines for memecoins, on NEAR.</b> Receipts for every roll.<br>
+  <a href="https://gaballs.vercel.app">Live app (testnet)</a> ·
+  <a href="docs/proof/gaballs-demo.mp4">Demo video</a> ·
+  <a href="docs/DEPLOYMENTS.md">Deployments</a> ·
+  <a href="docs/THREAT_MODEL.md">Threat model</a>
+</p>
+<p align="center">
+  <img src="docs/screenshots/machine.jpg" width="860" alt="The Gaballs Max machine page: 3D gumball machine, pack-size slider from $10 to $1,000, price, and the fixed odds table">
+</p>
 
 A gacha launchpad on NEAR. A creator launches a memecoin together with a gacha machine. Every pack (10 USDT, or any
 size from 10 to 1,000 USDT on newer machines) is a market buy of that coin on the machine's own bonding curve; a
@@ -18,6 +31,16 @@ Built at NEAR HACKATHON 2026. Tracks: `memecoins` (primary), `nfts`, `social`, `
 
 **Live app (testnet):** https://gaballs.vercel.app. Sign in with Google/email (no wallet needed), MetaMask, or any NEAR
 wallet; get free mock USDT on "My stuff". Everything is on NEAR **testnet**; mock USDT is not real money.
+
+## Screenshots
+
+All taken on the live testnet app (https://gaballs.vercel.app).
+
+| | |
+| --- | --- |
+| <img src="docs/screenshots/home.jpg" width="420" alt="Home page"><br>**Home:** every machine with its market cap, packs opened and best hit, each number linked to its on-chain source. | <img src="docs/screenshots/reveal.jpg" width="420" alt="Pack reveal"><br>**Reveal:** the capsule opens with the tier, multiplier, tokens received and their value, plus links to the randomness proof and the transaction. |
+| <img src="docs/screenshots/proof.jpg" width="420" alt="Randomness proof page"><br>**Randomness proof:** the OutLayer VRF alpha, signature and key for one pull, re-checked in the browser. | <img src="docs/screenshots/nfts.jpg" width="420" alt="My stuff: collection and Machine NFTs"><br>**My stuff:** the Collection (filled from on-chain pulls) and the creator's Machine NFTs with their fee balances. |
+| <img src="docs/screenshots/squad.jpg" width="420" alt="Squad page"><br>**Squad:** a Sputnik DAO's treasury, the Machine NFT it co-owns, and its proposals with votes. | <img src="docs/screenshots/launch.jpg" width="420" alt="Launch page"><br>**Launch:** name, symbol and creator allocation; the launch cost and fixed parameters are read from the factory. |
 
 ## 1. Problem and mechanic
 
