@@ -58,13 +58,19 @@ function Cloud({ style }: { style: CSSProperties }) {
   );
 }
 
-/** Gold coin, tilted, with a dark gold outline and an inner rim (as in the mock-up). */
+/** Gold coin, tilted, with a dark gold outline, an inner rim and the NEAR "N" stamped in the middle. */
 function Coin({ size }: { size: number }) {
   return (
     <svg viewBox="0 0 60 60" width={size} height={size} style={{ display: 'block', transform: 'rotate(-20deg)' }}>
       <ellipse cx="32" cy="32" rx="22" ry="25" fill="#c88a12" stroke={NAVY} strokeWidth="2" />
       <ellipse cx="28" cy="30" rx="22" ry="25" fill="#f6c344" stroke={NAVY} strokeWidth="2" />
       <ellipse cx="28" cy="30" rx="15" ry="18" fill="none" stroke="#d99c1c" strokeWidth="3" />
+      {/* the NEAR "N" mark, stamped in the middle */}
+      <path
+        transform="translate(19.5 23.4) scale(0.85)"
+        d="M15.8 0.6 L12.4 5.6 a0.37 0.37 0 0 0 0.55 0.48 l3.35 -2.9 a0.14 0.14 0 0 1 0.23 0.1 v9.1 a0.14 0.14 0 0 1 -0.25 0.09 L6.04 -0.5 A1.39 1.39 0 0 0 4.98 -1 h-0.35 A1.39 1.39 0 0 0 3.24 0.39 v13.22 A1.39 1.39 0 0 0 4.63 15 a1.39 1.39 0 0 0 1.18 -0.66 l3.4 -5.04 a0.37 0.37 0 0 0 -0.55 -0.48 l-3.35 2.9 a0.14 0.14 0 0 1 -0.23 -0.1 V2.54 a0.14 0.14 0 0 1 0.25 -0.09 l10.11 12.1 a1.39 1.39 0 0 0 1.06 0.5 h0.35 a1.39 1.39 0 0 0 1.39 -1.39 V0.39 A1.39 1.39 0 0 0 16.96 -1 a1.39 1.39 0 0 0 -1.16 0.6 Z"
+        fill={NAVY}
+      />
       <path d="M18 20 a14 16 0 0 1 10 -6" fill="none" stroke="#fff3c4" strokeWidth="3" strokeLinecap="round" />
     </svg>
   );

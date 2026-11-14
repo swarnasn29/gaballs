@@ -56,7 +56,7 @@ export function Header() {
       <Link href="/" className="flex items-center gap-2 py-1">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={art.brand.logo} alt="" width={44} height={44} className="h-10 w-10 sm:h-11 sm:w-11" />
-        <span className="font-display text-2xl font-bold text-ink sm:text-3xl">Gaballs</span>
+        <span className="font-display text-2xl font-bold text-ink sm:text-3xl">gaBalls</span>
         <span className="rounded-full bg-mint px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-mint-ink">{NETWORK}</span>
       </Link>
 
